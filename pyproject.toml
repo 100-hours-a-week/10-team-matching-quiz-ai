@@ -1,0 +1,61 @@
+[tool.poetry]
+name = "10-team-matching-quiz-ai"
+version = "0.1.0"
+description = "AI 기반 면접 질문 생성, 복습 퀴즈 생성, STT 피드백 서버"
+authors = ["tykong08 <taeyoung.kong@outlook.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.12"
+
+# 🔹 FastAPI + vLLM (AI 서버 및 서빙)
+fastapi = "0.115.9"
+uvicorn = "^0.29.0"
+vllm = "0.8.4"
+
+# 🔹 LangChain (체인 구성 및 RAG 연동)
+langchain = "0.3.24"
+
+# 🔹 Transformers & LoRA Fine-tuning (모델 로딩 및 파인튜닝)
+transformers = "4.51.3"
+accelerate = "^0.30.1"
+peft = "^0.10.0"
+datasets = "^2.19.0"
+
+# 🔹 STT (Whisper 기반)
+whisper = "^1.1.10"
+
+# 🔹 벡터 DB (RAG 용)
+chromadb = "1.0.7"
+
+# 🔹 Hugging Face + Embedding model
+sentence-transformers = "^2.7.0"
+scipy = "*"
+
+# 🔹 모니터링 (Langfuse + LangSmith)
+langfuse = "2.60.3"
+langsmith = "0.3.33"
+
+# 🔹 공통 유틸리티
+python-dotenv = "^1.0.1"
+pandas = "^2.2.2"
+tqdm = "^4.66.2"
+requests = "*"
+
+# 🔹 로깅 및 오류 처리
+loguru = "^0.7.2"
+
+# 🔹 S3, MySQL 연동
+boto3 = "^1.34.0"
+mysql-connector-python = "^8.4.0"
+
+# 🔹 테스트
+pytest = "^8.2.0"
+poetry-plugin-export = "^1.9.0"
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
