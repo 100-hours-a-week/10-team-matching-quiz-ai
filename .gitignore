@@ -17,8 +17,6 @@ env/
 
 # 패키지 관리 파일
 pip-log.txt
-poetry.lock
-Pipfile.lock
 
 # Jupyter notebook checkpoint
 .ipynb_checkpoints/
