@@ -1,0 +1,111 @@
+# -----------------------------
+# Python 환경 기본 무시 파일
+# -----------------------------
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pkl
+*.db
+*.sqlite3
+
+# 가상환경 무시
+venv/
+env/
+.venv/
+.env/
+
+# 패키지 관리 파일
+pip-log.txt
+
+# Jupyter notebook checkpoint
+.ipynb_checkpoints/
+.ipynb
+
+# -----------------------------
+# FastAPI / vLLM / LangChain / Chroma
+# 서비스 무시 파일
+# -----------------------------
+
+# FastAPI 서버 설정파일 (개인 local secret 포함 가능성)
+*.env
+.env.*
+.env
+
+# 모델 체크포인트 / 가중치 파일
+*.ckpt
+*.pth
+*.pt
+*.safetensors
+
+# Hugging Face cache (모델/토크나이저 등)
+huggingface/
+.cache/
+transformers_cache/
+datasets/
+
+# ChromaDB 데이터 디렉터리
+chroma_db/
+chroma_db/*
+
+# Langfuse 로컬 트래킹 파일
+.langfuse/
+
+# LangSmith 세션 로그
+.langsmith/
+
+# FastAPI static/media upload 디렉터리 (예: 음성 파일 저장)
+uploads/
+media/
+
+# -----------------------------
+# Fine-tuning 데이터/모델 무시 파일
+# -----------------------------
+
+# 전처리된 train/val jsonl 데이터셋 무시
+*.jsonl
+
+# 모델 결과 폴더 무시
+Training/model/
+question-generation/model
+
+# Fine-tuning 데이터셋 결과 폴더 무시
+fine-tuning/dataset/processed/
+fine-tuning/dataset/raw/
+model_cache
+
+# -----------------------------
+# Docker / Build 관련 무시 파일
+# -----------------------------
+
+# Docker 관련
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# 빌드 결과물
+build/
+dist/
+*.egg-info/
+
+# -----------------------------
+# 기타
+# -----------------------------
+
+# OS별 무시 파일
+.DS_Store
+Thumbs.db
+
+# IDE 세팅
+.vscode/
+.idea/
+*.iml
+
+# 로그파일
+*.log
+
+# 테스트 결과
+htmlcov/
+coverage.xml
+pytest_cache/
+.tox/
