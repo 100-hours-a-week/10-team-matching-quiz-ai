@@ -8,6 +8,9 @@ import os
 from typing import Optional, Union, Dict, Any
 from huggingface_hub import login
 from openai import OpenAI
+from dotenv import load_dotenv
+# .env 파일 로드
+load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

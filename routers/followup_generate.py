@@ -9,6 +9,11 @@ import os
 import logging
 import uuid
 from typing import List, Dict, Any, Optional
+from vector_db.query_pipeline import rag_retriever
+from dotenv import load_dotenv
+
+# .env 파일 로드
+load_dotenv()
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -60,10 +65,23 @@ def prepare_context(req: FollowupRequest) -> Dict[str, Any]:
         joined = "\n".join(f"- {q}" for q in all_used_questions)
         passed_section = f"\n\n[이전 질문 목록]\n{joined}"
 
+    retrieved_section = ""
+    try:
+        rag_results = rag_retriever(
+            req.selected_question, req.keyword or "", top_k=4)
+        retrieved_questions = [r["question"] for r in rag_results]
+        if retrieved_questions:
+            joined_rag = "\n".join(f"- {q}" for q in retrieved_questions)
+            retrieved_section = f"\n\n[유사한 기존 질문]\n{joined_rag}"
+    except Exception as e:
+        logging.warning(f"RAG 검색 실패: {e}")
+        retrieved_section = ""  # fallback
+
     return {
         "selected_question": req.selected_question,
         "keyword": req.keyword or "",
         "passed_questions": passed_section,
+        "retrieved_questions": retrieved_section,
         "num_questions": GENERATE_COUNT,
     }
 
