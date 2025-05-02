@@ -68,6 +68,7 @@ media/
 # 모델 결과 폴더 무시
 Training/model/
 question-generation/model
+model
 
 # Fine-tuning 데이터셋 결과 폴더 무시
 fine-tuning/dataset/processed/
