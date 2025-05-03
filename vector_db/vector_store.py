@@ -22,7 +22,3 @@ def save_to_vectorstore(questions, embeddings, batch_size=5000):
             embeddings=embeddings[i:i+batch_size],
             ids=ids[i:i+batch_size]
         )
-
-# 단독 실행 테스트용
-if __name__ == "__main__":
-    print("현재 저장된 벡터 수:", collection.count())

@@ -16,7 +16,3 @@ def init_vector_store_from_csv(csv_path: str):
 
     print(f"총 {len(questions)}개의 질문이 저장되었습니다.")
 
-# 단독 실행 테스트용
-if __name__ == "__main__":
-    init_vector_store_from_csv("./questions_data.csv")
-

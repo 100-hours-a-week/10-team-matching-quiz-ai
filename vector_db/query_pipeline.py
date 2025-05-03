@@ -1,6 +1,6 @@
 import numpy as np
-from embedding import embed_texts
-from vector_store import collection
+from vector_db.embedding import embed_texts
+from vector_db.vector_store import collection
 
 def cosine_similarity(a, b):
     a = np.array(a)
@@ -29,12 +29,4 @@ def rag_retriever(main_question: str, keyword: str, top_k: int = 6, sim_threshol
     filtered.sort(key=lambda x: -x["similarity"])
     return filtered[:top_k]
 
-# 단독 실행 테스트용
-if __name__ == "__main__":
-    main_q = "FastAPI의 비동기 처리 방식은 무엇인가요?"
-    keyword = "비동기"
-    results = rag_retriever(main_q, keyword)
 
-    print(f"\n 입력 질문: {main_q} / 키워드: {keyword}")
-    for i, item in enumerate(results, 1):
-        print(f"{i}. {item['question']} (유사도: {item['similarity']:.4f})")

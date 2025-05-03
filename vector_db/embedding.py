@@ -24,9 +24,3 @@ def embed_texts(texts, keyword: str = None):
     model = get_model()
     enriched = [enrich_question(text, keyword) for text in texts]
     return model.encode(enriched, normalize_embeddings=True).tolist()
-
-# 단독 실행 테스트용
-if __name__ == "__main__":
-    sample = ["FastAPI는 어떤 프레임워크인가요?", "Python의 특징은 무엇인가요?"]
-    vectors = embed_texts(sample, keyword="Python")
-    print("벡터 수:", len(vectors))
