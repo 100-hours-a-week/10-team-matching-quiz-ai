@@ -91,9 +91,24 @@ async def generate_primary_questions(prompt: str, trace) -> List[str]:
     llm_span = trace.span(name="llm_call")
 
     try:
-        raw_response = await call_llm(prompt)
-        llm_span.update(input={"prompt": prompt}, output={
-                        "raw_response": raw_response})
+        response = await call_llm(prompt)
+        raw_response = response['text']
+        model = response['model']
+        is_fallback = response.get('is_fallback', False)
+
+        # 스팬에 어떤 모델이 사용되었는지 명확히 기록
+        llm_span.update(
+            input={"prompt": prompt},
+            output={
+                "raw_response": raw_response,
+                "model_used": model,
+                "is_fallback": is_fallback
+            },
+            metadata={
+                "model_type": "openai" if is_fallback else "local_llm",
+                "model_name": model
+            }
+        )
         llm_span.end()
 
         parsing_span = trace.span(name="response_parsing")
@@ -133,10 +148,22 @@ async def generate_additional_questions(
     llm_span_api = trace.span(name="llm_call_additional")
 
     try:
-        raw_response_api = await call_openai_api(prompt_api)
+        response_api = await call_openai_api(prompt_api)
+        raw_response_api = response_api['text']
+        model = response_api['model']
+        cost = response_api.get('cost', 0)
+
         llm_span_api.update(
             input={"prompt_api": prompt_api},
-            output={"raw_response_api": raw_response_api}
+            output={
+                "raw_response_api": raw_response_api,
+                "model_used": model,
+                "cost": cost
+            },
+            metadata={
+                "model_type": "openai",
+                "model_name": model
+            }
         )
         llm_span_api.end()
 
@@ -205,7 +232,7 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
 
         # 결과 기록 및 백엔드 전송 태스크 생성
         trace.update(output={"followup_questions": generated_questions})
-        trace.end()
+        # trace.end()
 
         asyncio.create_task(safe_push(req.interview_id, generated_questions))
 
@@ -217,7 +244,7 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
 
     except Exception as e:
         trace.update(error={"message": str(e)})
-        trace.end()
+        # trace.end()
         logger.error(f"꼬리 질문 생성 실패: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
