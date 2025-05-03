@@ -38,9 +38,8 @@ langfuse = Langfuse(
 )
 
 # mac 구현 코드 - 4비트 모델을 사용할 경우 dtype 설정이 중요함
-# use_mps = torch.backends.mps.is_available()
-# dtype = "float16" if use_mps and torch.backends.mps.is_built() else "float32"
-dtype = "float16"
+use_mps = torch.backends.mps.is_available()
+dtype = "float16" if use_mps and torch.backends.mps.is_built() else "float32"
 
 # 지연 초기화를 위한 전역 변수
 llm = None
@@ -69,7 +68,7 @@ def initialize_llm():
         raise
 
 
-async def call_llm(prompt: str, try_fallback: bool = True) -> dict:
+async def call_llm(prompt: str, try_fallback: bool = True) -> str:
     """
     LLM에 프롬프트를 안전하게 전송하고 생성된 응답을 반환합니다.
 
@@ -78,11 +77,7 @@ async def call_llm(prompt: str, try_fallback: bool = True) -> dict:
         try_fallback (bool): 로컬 모델 실패 시 OpenAI 기반 fallback 사용 여부
 
     Returns:
-        dict: {
-            'text': 모델이 생성한 응답 텍스트,
-            'model': 사용된 모델 이름,
-            'is_fallback': fallback 사용 여부
-        }
+        str: 모델이 생성한 응답 텍스트
 
     Raises:
         Exception: LLM 호출 과정에서 발생한 예외 (fallback이 false이거나 fallback도 실패한 경우)
@@ -95,12 +90,7 @@ async def call_llm(prompt: str, try_fallback: bool = True) -> dict:
         except Exception as e:
             if try_fallback and OPENAI_API_KEY:
                 logger.warning(f"로컬 LLM 초기화 실패, OpenAI로 fallback: {e}")
-                response = await call_openai_api(prompt)
-                return {
-                    'text': response['text'],
-                    'model': response['model'],
-                    'is_fallback': True
-                }
+                return await call_openai_api(prompt)
             else:
                 raise
 
@@ -143,13 +133,9 @@ async def call_llm(prompt: str, try_fallback: bool = True) -> dict:
             output=result,
             metadata={"execution_time_seconds": execution_time}
         )
-        # trace.end()
+        trace.end()
 
-        return {
-            'text': result,
-            'model': MODEL_PATH,
-            'is_fallback': False
-        }
+        return result
     except (asyncio.TimeoutError, Exception) as e:
         error_type = "TimeoutError" if isinstance(
             e, asyncio.TimeoutError) else "Error"
@@ -160,20 +146,14 @@ async def call_llm(prompt: str, try_fallback: bool = True) -> dict:
         if locals().get('generation'):
             generation.end(error=error_message)
         if locals().get('trace'):
-            pass
-            # trace.end(error=error_message)
+            trace.end(error=error_message)
 
         logger.error(error_message)
 
         # Fallback 로직
         if try_fallback and OPENAI_API_KEY:
             logger.info("로컬 LLM 실패, OpenAI API로 fallback")
-            response = await call_openai_api(prompt)
-            return {
-                'text': response['text'],
-                'model': response['model'],
-                'is_fallback': True
-            }
+            return await call_openai_api(prompt)
 
         # Fallback이 비활성화되었거나 OpenAI 키가 없는 경우 예외 발생
         if isinstance(e, asyncio.TimeoutError):
@@ -182,7 +162,7 @@ async def call_llm(prompt: str, try_fallback: bool = True) -> dict:
             raise Exception(error_message)
 
 
-async def call_openai_api(prompt: str) -> dict:
+async def call_openai_api(prompt: str) -> str:
     """
     OpenAI API를 사용하여 프롬프트에 대한 응답을 생성합니다.
     주로 부족한 질문을 채우기 위한 백업 메커니즘으로 사용됩니다.
@@ -191,11 +171,7 @@ async def call_openai_api(prompt: str) -> dict:
         prompt (str): OpenAI 모델에 전달할 텍스트 프롬프트
 
     Returns:
-        dict: {
-            'text': 모델이 생성한 응답 텍스트,
-            'model': 사용된 모델 이름,
-            'cost': 사용 비용
-        }
+        str: 모델이 생성한 응답 텍스트
 
     Raises:
         Exception: API 호출 과정에서 발생한 예외
@@ -239,11 +215,9 @@ async def call_openai_api(prompt: str) -> dict:
         logger.info(
             f"OpenAI API 호출 성공: 입력 토큰 {input_tokens}, 출력 토큰 {output_tokens}, 비용 ${cost:.5f}")
 
-        output_text = response.choices[0].message.content
-
         # Langfuse에 사용량 및 비용 업데이트
         generation.end(
-            output=output_text,
+            output=response.choices[0].message.content,
             usage_details={
                 "input": input_tokens,
                 "output": output_tokens,
@@ -256,11 +230,7 @@ async def call_openai_api(prompt: str) -> dict:
             }
         )
 
-        return {
-            'text': output_text,
-            'model': model_name,
-            'cost': cost
-        }
+        return response.choices[0].message.content
     except Exception as e:
         # 에러가 발생한 경우에도 Langfuse에 기록
         if locals().get('generation'):
