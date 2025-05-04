@@ -11,7 +11,8 @@ def parse_questions(text: str,
     """
     주어진 텍스트에서 질문 목록을 추출합니다.
 
-    기본적으로 "질문 N." 형식을 찾지만, 추가 패턴을 전달하여 다른 형식도 인식할 수 있습니다.
+    다양한 질문 형식("질문 N.", "Q1", "Question 1" 등)을 기본 지원하며,
+    추가 패턴을 전달하여 다른 형식도 인식할 수 있습니다.
 
     Args:
         text: 질문이 포함된 문자열
@@ -21,12 +22,23 @@ def parse_questions(text: str,
     Returns:
         추출된 질문 문자열 리스트
     """
-    # 기본 패턴: "질문 N. " 형식
-    default_pattern = re.compile(
-        r'^질문\s+\d+\.\s*(.+?)(?=\n질문\s+\d+\.|\Z)', re.MULTILINE | re.DOTALL)
+    # 기본 패턴들 정의
+    default_patterns = [
+        # 한국어 패턴
+        re.compile(r'^질문\s+\d+\.?\s*(.+?)(?=\n질문\s+\d+\.?|\Z)', re.MULTILINE | re.DOTALL),
+        re.compile(r'^문제\s+\d+\.?\s*(.+?)(?=\n문제\s+\d+\.?|\Z)', re.MULTILINE | re.DOTALL),
+        re.compile(r'^Q\s*\d+\.?\s*(.+?)(?=\nQ\s*\d+\.?|\Z)', re.MULTILINE | re.DOTALL),
+        
+        # 영어 패턴
+        re.compile(r'^Question\s+\d+\.?\s*(.+?)(?=\nQuestion\s+\d+\.?|\Z)', re.MULTILINE | re.DOTALL),
+        re.compile(r'^Q\.*\s*\d+\.?\s*(.+?)(?=\nQ\.*\s*\d+\.?|\Z)', re.MULTILINE | re.DOTALL),
+        
+        # 숫자로만 시작하는 패턴 (예: "1. 질문내용")
+        re.compile(r'^\d+\.\s*(.+?)(?=\n\d+\.|\Z)', re.MULTILINE | re.DOTALL),
+    ]
 
-    # 추가 패턴들 (필요한 경우)
-    all_patterns = [default_pattern]
+    # 추가 패턴들 통합
+    all_patterns = default_patterns.copy()
     if patterns:
         all_patterns.extend(patterns)
 
@@ -54,7 +66,9 @@ def parse_questions(text: str,
                 # 기본 마크다운 서식 제거
                 q = q.replace('**', '').replace('*',
                                                 '').replace('`', '').replace('#', '').strip()
-                # 추가 마크다운 패턴 제거 (필요시)
+                # 추가 마크다운 패턴 제거
+                q = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', q)  # 링크 제거
+                q = re.sub(r'~~([^~]+)~~', r'\1', q)  # 취소선 제거
 
             # 빈 문자열이거나 플레이스홀더인 경우 제외
             if not q or q == "..." or len(q) < 3:
