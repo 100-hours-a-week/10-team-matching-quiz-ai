@@ -113,3 +113,21 @@ pytest_cache/
 
 # 외부 gpu연결
 cloudflared
+
+# 데이터셋
+dataset
+
+# 모델 트레이닝
+training
+
+# pyright / mypy 캐시
+.pyright/
+.mypy_cache/
+
+# MacOS 자동 백업
+*.swp
+*.tmp
+
+# 파인튜닝 중간 결과 (예: tokenizer config 등)
+*.json
+*.lock
