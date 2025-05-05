@@ -213,7 +213,7 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
 
         # 결과 기록 및 백엔드 전송 태스크 생성
         trace.update(output={"followup_questions": generated_questions})
-        trace.end()
+        # trace.end()
 
         asyncio.create_task(safe_push(req.interview_id, generated_questions))
 
@@ -225,7 +225,7 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
 
     except Exception as e:
         trace.update(error={"message": str(e)})
-        trace.end()
+        # trace.end()
         logger.error(f"꼬리 질문 생성 실패: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
