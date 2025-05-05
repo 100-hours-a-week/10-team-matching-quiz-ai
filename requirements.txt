@@ -1,257 +1,246 @@
-accelerate==0.30.1
-aiohappyeyeballs==2.6.1
-aiohttp==3.11.18
-aiohttp-cors==0.8.1
-aiosignal==1.3.2
-airportsdata==20250224
-annotated-types==0.7.0
-anyio==4.9.0
-appnope==0.1.4
-asgiref==3.8.1
-astor==0.8.1
-asttokens==3.0.0
-attrs==25.3.0
-backoff==2.2.1
-backports.tarfile==1.2.0
-bcrypt==4.3.0
-blake3==1.0.4
-boto3==1.38.8
-botocore==1.38.8
-build==1.2.2.post1
-CacheControl==0.14.3
-cachetools==5.5.2
-certifi==2025.4.26
-cffi==1.17.1
-charset-normalizer==3.4.1
-chroma-hnswlib==0.7.6
-chromadb==1.0.7
-cleo==2.1.0
-click==8.1.8
-cloudpickle==3.1.1
-coloredlogs==15.0.1
-colorful==0.5.6
-comm==0.2.2
-compressed-tensors==0.9.3
-crashtest==0.4.1
-datasets==2.21.0
-debugpy==1.8.14
-decorator==5.2.1
-Deprecated==1.2.18
-depyf==0.18.0
-dill==0.3.8
-diskcache==5.6.3
-distlib==0.3.9
-distro==1.9.0
-dnspython==2.7.0
-dulwich==0.22.8
-durationpy==0.9
-einops==0.8.1
-email_validator==2.2.0
-executing==2.2.0
-fastapi==0.115.9
-fastapi-cli==0.0.7
-fastjsonschema==2.21.1
-filelock==3.18.0
-findpython==0.6.3
-flatbuffers==25.2.10
-frozenlist==1.6.0
-fschat==0.2.36
-fsspec==2024.6.1
-gguf==0.16.2
-google-api-core==2.24.2
-google-auth==2.39.0
-googleapis-common-protos==1.70.0
-grpcio==1.71.0
-h11==0.16.0
-hf-xet==1.1.0
-httpcore==1.0.9
-httptools==0.6.4
-httpx==0.28.1
-huggingface-hub==0.30.2
-humanfriendly==10.0
-idna==3.10
-importlib_metadata==8.0.0
-importlib_resources==6.5.2
-iniconfig==2.1.0
-installer==0.7.0
-interegular==0.3.3
-ipykernel==6.29.5
-ipython==9.2.0
-ipython_pygments_lexers==1.1.1
-jaraco.classes==3.4.0
-jaraco.context==6.0.1
-jaraco.functools==4.1.0
-jedi==0.19.2
-Jinja2==3.1.6
-jiter==0.9.0
-jmespath==1.0.1
-joblib==1.5.0
-jsonpatch==1.33
-jsonpointer==3.0.0
-jsonschema==4.23.0
-jsonschema-specifications==2025.4.1
-jupyter_client==8.6.3
-jupyter_core==5.7.2
-keyring==25.6.0
-kubernetes==32.0.1
-langchain==0.3.24
-langchain-core==0.3.58
-langchain-text-splitters==0.3.8
-langfuse==2.60.3
-langsmith==0.3.33
-lark==1.2.2
-latex2mathml==3.78.0
-llguidance==0.7.19
-llvmlite==0.44.0
-lm-format-enforcer==0.10.11
-loguru==0.7.3
-markdown-it-py==3.0.0
-markdown2==2.5.3
-MarkupSafe==3.0.2
-matplotlib-inline==0.1.7
-mdurl==0.1.2
-mistral_common==1.5.4
-mmh3==5.1.0
-monotonic==1.6
-more-itertools==10.7.0
-mpmath==1.3.0
-msgpack==1.1.0
-msgspec==0.19.0
-multidict==6.4.3
-multiprocess==0.70.16
-mysql-connector-python==8.4.0
-nest-asyncio==1.6.0
-networkx==3.4.2
-nh3==0.2.21
-ninja==1.11.1.4
-numba==0.61.2
-numpy==2.2.5
-nvidia-ml-py==12.570.86
-oauthlib==3.2.2
-onnxruntime==1.21.1
-openai==1.77.0
-opencensus==0.11.4
-opencensus-context==0.1.3
-opencv-python-headless==4.11.0.86
-opentelemetry-api==1.26.0
-opentelemetry-exporter-otlp==1.26.0
-opentelemetry-exporter-otlp-proto-common==1.26.0
-opentelemetry-exporter-otlp-proto-grpc==1.26.0
-opentelemetry-exporter-otlp-proto-http==1.26.0
-opentelemetry-instrumentation==0.47b0
-opentelemetry-instrumentation-asgi==0.47b0
-opentelemetry-instrumentation-fastapi==0.47b0
-opentelemetry-proto==1.26.0
-opentelemetry-sdk==1.26.0
-opentelemetry-semantic-conventions==0.47b0
-opentelemetry-semantic-conventions-ai==0.4.5
-opentelemetry-util-http==0.47b0
-orjson==3.10.16
-outlines==0.1.11
-outlines_core==0.1.26
-overrides==7.7.0
-packaging==24.2
-pandas==2.2.3
-parso==0.8.4
-partial-json-parser==0.2.1.1.post5
-pbs-installer==2025.4.9
-peft==0.10.0
-pexpect==4.9.0
-pillow==11.2.1
-pkginfo==1.12.1.2
-platformdirs==4.3.7
-pluggy==1.5.0
-poetry==2.1.3
-poetry-core==2.1.3
-poetry-plugin-export==1.9.0
-posthog==4.0.0
-prometheus-fastapi-instrumentator==7.1.0
-prometheus_client==0.21.1
-prompt_toolkit==3.0.51
-propcache==0.3.1
-proto-plus==1.26.1
-protobuf==4.25.7
-psutil==7.0.0
-ptyprocess==0.7.0
-pure_eval==0.2.3
-py-cpuinfo==9.0.0
-py-spy==0.4.0
-pyarrow==20.0.0
-pyasn1==0.6.1
-pyasn1_modules==0.4.2
-pycountry==24.6.1
-pycparser==2.22
-pydantic==2.11.3
-pydantic_core==2.33.1
-Pygments==2.19.1
-PyPika==0.48.9
-pyproject_hooks==1.2.0
-pytest==8.3.5
-python-dateutil==2.9.0.post0
-python-dotenv==1.1.0
-python-json-logger==3.3.0
-python-multipart==0.0.20
-pytz==2025.2
-PyYAML==6.0.2
-pyzmq==26.4.0
-RapidFuzz==3.13.0
-ray==2.43.0
-referencing==0.36.2
-regex==2024.11.6
-requests==2.32.3
-requests-oauthlib==2.0.0
-requests-toolbelt==1.0.0
-rich==14.0.0
-rich-toolkit==0.14.3
-rpds-py==0.24.0
-rsa==4.9.1
-s3transfer==0.12.0
-safetensors==0.5.3
-scikit-learn==1.6.1
-scipy==1.15.2
-sentence-transformers==2.7.0
-sentencepiece==0.2.0
-shellingham==1.5.4
-shortuuid==1.0.13
-six==1.17.0
-smart-open==7.1.0
-sniffio==1.3.1
-SQLAlchemy==2.0.40
-stack-data==0.6.3
-starlette==0.45.3
-svgwrite==1.4.3
-sympy==1.13.1
-tenacity==9.1.2
-threadpoolctl==3.6.0
-tiktoken==0.9.0
-tokenizers==0.21.1
-tomlkit==0.13.2
-torch==2.6.0
-torchaudio==2.6.0
-torchvision==0.21.0
-tornado==6.4.2
-tqdm==4.67.1
-traitlets==5.14.3
-transformers==4.51.3
-trove-classifiers==2025.5.1.12
-typer==0.15.3
-typing-inspection==0.4.0
-typing_extensions==4.13.2
-tzdata==2025.2
-urllib3==2.4.0
-uvicorn==0.29.0
-uvloop==0.21.0
-virtualenv==20.30.0
-vllm==0.8.5.post1
-watchfiles==1.0.5
-wavedrom==2.0.3.post3
-wcwidth==0.2.13
-websocket-client==1.8.0
-websockets==15.0.1
-whisper==1.1.10
-wrapt==1.17.2
-xattr==1.1.4
-xxhash==3.5.0
-yarl==1.20.0
-zipp==3.21.0
-zstandard==0.23.0
+accelerate==0.30.1 ; python_version == "3.11"
+aiohappyeyeballs==2.6.1 ; python_version == "3.11"
+aiohttp==3.11.18 ; python_version == "3.11"
+aiosignal==1.3.2 ; python_version == "3.11"
+airportsdata==20250224 ; python_version == "3.11"
+annotated-types==0.7.0 ; python_version == "3.11"
+anyio==4.9.0 ; python_version == "3.11"
+asgiref==3.8.1 ; python_version == "3.11"
+astor==0.8.1 ; python_version == "3.11"
+attrs==25.3.0 ; python_version == "3.11"
+backoff==2.2.1 ; python_version == "3.11"
+backports-tarfile==1.2.0 ; python_version == "3.11"
+bcrypt==4.3.0 ; python_version == "3.11"
+blake3==1.0.4 ; python_version == "3.11"
+boto3==1.38.8 ; python_version == "3.11"
+botocore==1.38.8 ; python_version == "3.11"
+build==1.2.2.post1 ; python_version == "3.11"
+cachecontrol==0.14.3 ; python_version == "3.11"
+cachetools==5.5.2 ; python_version == "3.11"
+certifi==2025.4.26 ; python_version == "3.11"
+cffi==1.17.1 ; (implementation_name == "pypy" or platform_python_implementation == "PyPy" or sys_platform == "linux" or sys_platform == "darwin") and python_version == "3.11"
+charset-normalizer==3.4.1 ; python_version == "3.11"
+chroma-hnswlib==0.7.6 ; python_version == "3.11"
+chromadb==1.0.7 ; python_version == "3.11"
+cleo==2.1.0 ; python_version == "3.11"
+click==8.1.8 ; python_version == "3.11"
+cloudpickle==3.1.1 ; python_version == "3.11"
+colorama==0.4.6 ; (platform_system == "Windows" or sys_platform == "win32" or os_name == "nt") and python_version == "3.11"
+coloredlogs==15.0.1 ; python_version == "3.11"
+compressed-tensors==0.9.3 ; python_version == "3.11"
+crashtest==0.4.1 ; python_version == "3.11"
+cryptography==44.0.3 ; python_version == "3.11" and sys_platform == "linux"
+cupy-cuda12x==13.4.1 ; python_version == "3.11" and sys_platform != "darwin"
+datasets==2.21.0 ; python_version == "3.11"
+deprecated==1.2.18 ; python_version == "3.11"
+depyf==0.18.0 ; python_version == "3.11"
+dill==0.3.8 ; python_version == "3.11"
+diskcache==5.6.3 ; python_version == "3.11"
+distlib==0.3.9 ; python_version == "3.11"
+distro==1.9.0 ; python_version == "3.11"
+dnspython==2.7.0 ; python_version == "3.11"
+dulwich==0.22.8 ; python_version == "3.11"
+durationpy==0.9 ; python_version == "3.11"
+einops==0.8.1 ; python_version == "3.11"
+email-validator==2.2.0 ; python_version == "3.11"
+fastapi-cli==0.0.7 ; python_version == "3.11"
+fastapi==0.115.9 ; python_version == "3.11"
+fastjsonschema==2.21.1 ; python_version == "3.11"
+fastrlock==0.8.3 ; python_version == "3.11" and sys_platform != "darwin"
+filelock==3.18.0 ; python_version == "3.11"
+findpython==0.6.3 ; python_version == "3.11"
+flatbuffers==25.2.10 ; python_version == "3.11"
+frozenlist==1.6.0 ; python_version == "3.11"
+fsspec==2024.6.1 ; python_version == "3.11"
+gguf==0.16.2 ; python_version == "3.11"
+google-auth==2.39.0 ; python_version == "3.11"
+googleapis-common-protos==1.70.0 ; python_version == "3.11"
+greenlet==3.2.1 ; python_version == "3.11" and (platform_machine == "aarch64" or platform_machine == "ppc64le" or platform_machine == "x86_64" or platform_machine == "amd64" or platform_machine == "AMD64" or platform_machine == "win32" or platform_machine == "WIN32")
+grpcio==1.71.0 ; python_version == "3.11"
+h11==0.16.0 ; python_version == "3.11"
+hf-xet==1.1.0 ; python_version == "3.11"
+httpcore==1.0.9 ; python_version == "3.11"
+httptools==0.6.4 ; python_version == "3.11"
+httpx==0.28.1 ; python_version == "3.11"
+huggingface-hub==0.30.2 ; python_version == "3.11"
+humanfriendly==10.0 ; python_version == "3.11"
+idna==3.10 ; python_version == "3.11"
+importlib-metadata==8.0.0 ; python_version == "3.11"
+importlib-resources==6.5.2 ; python_version == "3.11"
+iniconfig==2.1.0 ; python_version == "3.11"
+installer==0.7.0 ; python_version == "3.11"
+interegular==0.3.3 ; python_version == "3.11"
+jaraco-classes==3.4.0 ; python_version == "3.11"
+jaraco-context==6.0.1 ; python_version == "3.11"
+jaraco-functools==4.1.0 ; python_version == "3.11"
+jeepney==0.9.0 ; python_version == "3.11" and sys_platform == "linux"
+jinja2==3.1.6 ; python_version == "3.11"
+jiter==0.9.0 ; python_version == "3.11"
+jmespath==1.0.1 ; python_version == "3.11"
+joblib==1.5.0 ; python_version == "3.11"
+jsonpatch==1.33 ; python_version == "3.11"
+jsonpointer==3.0.0 ; python_version == "3.11"
+jsonschema-specifications==2025.4.1 ; python_version == "3.11"
+jsonschema==4.23.0 ; python_version == "3.11"
+keyring==25.6.0 ; python_version == "3.11"
+kubernetes==32.0.1 ; python_version == "3.11"
+langchain-core==0.3.58 ; python_version == "3.11"
+langchain-text-splitters==0.3.8 ; python_version == "3.11"
+langchain==0.3.24 ; python_version == "3.11"
+langfuse==2.60.3 ; python_version == "3.11"
+langsmith==0.3.33 ; python_version == "3.11"
+lark==1.2.2 ; python_version == "3.11"
+llguidance==0.7.19 ; python_version == "3.11" and (platform_machine == "x86_64" or platform_machine == "arm64" or platform_machine == "aarch64")
+llvmlite==0.44.0 ; python_version == "3.11"
+lm-format-enforcer==0.10.11 ; python_version == "3.11"
+loguru==0.7.3 ; python_version == "3.11"
+markdown-it-py==3.0.0 ; python_version == "3.11"
+markupsafe==3.0.2 ; python_version == "3.11"
+mdurl==0.1.2 ; python_version == "3.11"
+mistral-common==1.5.4 ; python_version == "3.11"
+mmh3==5.1.0 ; python_version == "3.11"
+monotonic==1.6 ; python_version == "3.11"
+more-itertools==10.7.0 ; python_version == "3.11"
+mpmath==1.3.0 ; python_version == "3.11"
+msgpack==1.1.0 ; python_version == "3.11"
+msgspec==0.19.0 ; python_version == "3.11"
+multidict==6.4.3 ; python_version == "3.11"
+multiprocess==0.70.16 ; python_version == "3.11"
+mysql-connector-python==8.4.0 ; python_version == "3.11"
+nest-asyncio==1.6.0 ; python_version == "3.11"
+networkx==3.4.2 ; python_version == "3.11"
+ninja==1.11.1.4 ; python_version == "3.11"
+numba==0.61.2 ; python_version == "3.11"
+numpy==2.2.5 ; python_version == "3.11"
+nvidia-cublas-cu12==12.4.5.8 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+nvidia-cuda-cupti-cu12==12.4.127 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+nvidia-cuda-nvrtc-cu12==12.4.127 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+nvidia-cuda-runtime-cu12==12.4.127 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+nvidia-cudnn-cu12==9.1.0.70 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+nvidia-cufft-cu12==11.2.1.3 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+nvidia-curand-cu12==10.3.5.147 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+nvidia-cusolver-cu12==11.6.1.9 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+nvidia-cusparse-cu12==12.3.1.170 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+nvidia-cusparselt-cu12==0.6.2 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+nvidia-nccl-cu12==2.21.5 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+nvidia-nvjitlink-cu12==12.4.127 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+nvidia-nvtx-cu12==12.4.127 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+oauthlib==3.2.2 ; python_version == "3.11"
+onnxruntime==1.21.1 ; python_version == "3.11"
+openai==1.77.0 ; python_version == "3.11"
+opencv-python-headless==4.11.0.86 ; python_version == "3.11"
+opentelemetry-api==1.26.0 ; python_version == "3.11"
+opentelemetry-exporter-otlp-proto-common==1.26.0 ; python_version == "3.11"
+opentelemetry-exporter-otlp-proto-grpc==1.26.0 ; python_version == "3.11"
+opentelemetry-exporter-otlp-proto-http==1.26.0 ; python_version == "3.11"
+opentelemetry-exporter-otlp==1.26.0 ; python_version == "3.11"
+opentelemetry-instrumentation-asgi==0.47b0 ; python_version == "3.11"
+opentelemetry-instrumentation-fastapi==0.47b0 ; python_version == "3.11"
+opentelemetry-instrumentation==0.47b0 ; python_version == "3.11"
+opentelemetry-proto==1.26.0 ; python_version == "3.11"
+opentelemetry-sdk==1.26.0 ; python_version == "3.11"
+opentelemetry-semantic-conventions-ai==0.4.5 ; python_version == "3.11"
+opentelemetry-semantic-conventions==0.47b0 ; python_version == "3.11"
+opentelemetry-util-http==0.47b0 ; python_version == "3.11"
+orjson==3.10.16 ; python_version == "3.11"
+outlines-core==0.1.26 ; python_version == "3.11"
+outlines==0.1.11 ; python_version == "3.11"
+overrides==7.7.0 ; python_version == "3.11"
+packaging==24.2 ; python_version == "3.11"
+pandas==2.2.3 ; python_version == "3.11"
+partial-json-parser==0.2.1.1.post5 ; python_version == "3.11"
+pbs-installer==2025.4.9 ; python_version == "3.11"
+peft==0.10.0 ; python_version == "3.11"
+pillow==11.2.1 ; python_version == "3.11"
+pkginfo==1.12.1.2 ; python_version == "3.11"
+platformdirs==4.3.7 ; python_version == "3.11"
+pluggy==1.5.0 ; python_version == "3.11"
+poetry-core==2.1.3 ; python_version == "3.11"
+poetry-plugin-export==1.9.0 ; python_version == "3.11"
+poetry==2.1.3 ; python_version == "3.11"
+posthog==4.0.0 ; python_version == "3.11"
+prometheus-client==0.21.1 ; python_version == "3.11"
+prometheus-fastapi-instrumentator==7.1.0 ; python_version == "3.11"
+propcache==0.3.1 ; python_version == "3.11"
+protobuf==4.25.7 ; python_version == "3.11"
+psutil==7.0.0 ; python_version == "3.11"
+py-cpuinfo==9.0.0 ; python_version == "3.11"
+pyarrow==20.0.0 ; python_version == "3.11"
+pyasn1-modules==0.4.2 ; python_version == "3.11"
+pyasn1==0.6.1 ; python_version == "3.11"
+pycountry==24.6.1 ; python_version == "3.11"
+pycparser==2.22 ; (implementation_name == "pypy" or platform_python_implementation == "PyPy" or sys_platform == "linux" or sys_platform == "darwin") and python_version == "3.11"
+pydantic-core==2.33.1 ; python_version == "3.11"
+pydantic==2.11.3 ; python_version == "3.11"
+pygments==2.19.1 ; python_version == "3.11"
+pypika==0.48.9 ; python_version == "3.11"
+pyproject-hooks==1.2.0 ; python_version == "3.11"
+pyreadline3==3.5.4 ; python_version == "3.11" and sys_platform == "win32"
+pytest==8.3.5 ; python_version == "3.11"
+python-dateutil==2.9.0.post0 ; python_version == "3.11"
+python-dotenv==1.1.0 ; python_version == "3.11"
+python-json-logger==3.3.0 ; python_version == "3.11"
+python-multipart==0.0.20 ; python_version == "3.11"
+pytz==2025.2 ; python_version == "3.11"
+pywin32-ctypes==0.2.3 ; python_version == "3.11" and sys_platform == "win32"
+pyyaml==6.0.2 ; python_version == "3.11"
+pyzmq==26.4.0 ; python_version == "3.11"
+rapidfuzz==3.13.0 ; python_version == "3.11"
+ray==2.43.0 ; python_version == "3.11"
+referencing==0.36.2 ; python_version == "3.11"
+regex==2024.11.6 ; python_version == "3.11"
+requests-oauthlib==2.0.0 ; python_version == "3.11"
+requests-toolbelt==1.0.0 ; python_version == "3.11"
+requests==2.32.3 ; python_version == "3.11"
+rich-toolkit==0.14.3 ; python_version == "3.11"
+rich==14.0.0 ; python_version == "3.11"
+rpds-py==0.24.0 ; python_version == "3.11"
+rsa==4.9.1 ; python_version == "3.11"
+s3transfer==0.12.0 ; python_version == "3.11"
+safetensors==0.5.3 ; python_version == "3.11"
+scikit-learn==1.6.1 ; python_version == "3.11"
+scipy==1.15.2 ; python_version == "3.11"
+secretstorage==3.3.3 ; python_version == "3.11" and sys_platform == "linux"
+sentence-transformers==2.7.0 ; python_version == "3.11"
+sentencepiece==0.2.0 ; python_version == "3.11"
+setuptools==80.0.0 ; python_version == "3.11"
+shellingham==1.5.4 ; python_version == "3.11"
+six==1.17.0 ; python_version == "3.11"
+sniffio==1.3.1 ; python_version == "3.11"
+sqlalchemy==2.0.40 ; python_version == "3.11"
+starlette==0.45.3 ; python_version == "3.11"
+sympy==1.13.1 ; python_version == "3.11"
+tenacity==9.1.2 ; python_version == "3.11"
+threadpoolctl==3.6.0 ; python_version == "3.11"
+tiktoken==0.9.0 ; python_version == "3.11"
+tokenizers==0.21.1 ; python_version == "3.11"
+tomlkit==0.13.2 ; python_version == "3.11"
+torch==2.6.0 ; python_version == "3.11"
+torchaudio==2.6.0 ; python_version == "3.11"
+torchvision==0.21.0 ; python_version == "3.11"
+tqdm==4.67.1 ; python_version == "3.11"
+transformers==4.51.3 ; python_version == "3.11"
+triton==3.2.0 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+trove-classifiers==2025.5.1.12 ; python_version == "3.11"
+typer==0.15.3 ; python_version == "3.11"
+typing-extensions==4.13.2 ; python_version == "3.11"
+typing-inspection==0.4.0 ; python_version == "3.11"
+tzdata==2025.2 ; python_version == "3.11"
+urllib3==2.4.0 ; python_version == "3.11"
+uvicorn==0.29.0 ; python_version == "3.11"
+uvloop==0.21.0 ; sys_platform != "win32" and sys_platform != "cygwin" and platform_python_implementation != "PyPy" and python_version == "3.11"
+virtualenv==20.30.0 ; python_version == "3.11"
+vllm==0.8.5.post1 ; python_version == "3.11"
+watchfiles==1.0.5 ; python_version == "3.11"
+websocket-client==1.8.0 ; python_version == "3.11"
+websockets==15.0.1 ; python_version == "3.11"
+whisper==1.1.10 ; python_version == "3.11"
+win32-setctime==1.2.0 ; python_version == "3.11" and sys_platform == "win32"
+wrapt==1.17.2 ; python_version == "3.11"
+xattr==1.1.4 ; python_version == "3.11" and sys_platform == "darwin"
+xformers==0.0.29.post2 ; platform_system == "Linux" and platform_machine == "x86_64" and python_version == "3.11"
+xgrammar==0.1.18 ; python_version == "3.11" and (platform_machine == "x86_64" or platform_machine == "aarch64")
+xxhash==3.5.0 ; python_version == "3.11"
+yarl==1.20.0 ; python_version == "3.11"
+zipp==3.21.0 ; python_version == "3.11"
+zstandard==0.23.0 ; python_version == "3.11"
