@@ -54,7 +54,7 @@ def validate_request(req: FollowupRequest) -> None:
         )
 
 
-def prepare_context(req: FollowupRequest) -> Dict[str, Any]:
+def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
     """요청 데이터로부터 프롬프트 컨텍스트 준비"""
     # 사용된 질문 목록 최대 20개로 제한
     all_used_questions = (req.passed_questions or [])[-MAX_HISTORY_QUESTIONS:]
@@ -66,15 +66,22 @@ def prepare_context(req: FollowupRequest) -> Dict[str, Any]:
         passed_section = f"\n\n[이전 질문 목록]\n{joined}"
 
     retrieved_section = ""
+    # RAG 스팬 생성
+    rag_span = trace.span(name="rag_retrieval")
     try:
         rag_results = rag_retriever(
             req.selected_question, req.keyword or "", top_k=4)
+        rag_span.update(
+            input={"query": req.selected_question, "keyword": req.keyword or ""},
+            output={"results": rag_results})
         retrieved_questions = [r["question"] for r in rag_results]
         if retrieved_questions:
             joined_rag = "\n".join(f"- {q}" for q in retrieved_questions)
             retrieved_section = f"\n\n[유사한 기존 질문]\n{joined_rag}"
+        rag_span.end()
     except Exception as e:
         logging.warning(f"RAG 검색 실패: {e}")
+        rag_span.end(error=str(e))
         retrieved_section = ""  # fallback
 
     return {
@@ -91,7 +98,7 @@ async def generate_primary_questions(prompt: str, trace) -> List[str]:
     llm_span = trace.span(name="llm_call")
 
     try:
-        raw_response = await call_llm(prompt)
+        raw_response = await call_llm(prompt, trace_id=trace.id)
         llm_span.update(input={"prompt": prompt}, output={
                         "raw_response": raw_response})
         llm_span.end()
@@ -130,10 +137,10 @@ async def generate_additional_questions(
         "followup_questions_generator_api")
     prompt_api = prompt_template_api.compile(**context_api)
 
-    llm_span_api = trace.span(name="llm_call_additional")
+    llm_span_api = trace.span(name="open-api-call")
 
     try:
-        raw_response_api = await call_openai_api(prompt_api)
+        raw_response_api = await call_openai_api(prompt_api, trace_id=trace.id)
         llm_span_api.update(
             input={"prompt_api": prompt_api},
             output={"raw_response_api": raw_response_api}
@@ -171,12 +178,7 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
 
     # 트레이스 ID 생성 및 컨텍스트 준비
     trace_id = f"followup_{req.interview_id}_{uuid.uuid4().hex}"
-    context = prepare_context(req)
-
-    # 메인 프롬프트 컴파일
-    prompt_template = langfuse.get_prompt("followup_questions_generator")
-    prompt = prompt_template.compile(**context)
-
+    
     trace = langfuse.trace(
         id=trace_id,
         name="followup_generation_llm",
@@ -184,9 +186,15 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
             "interview_id": req.interview_id,
             "selected_question": req.selected_question,
             "keyword": req.keyword,
-            "passed_questions": context["passed_questions"],
+            "passed_questions": req.passed_questions or [],
         }
     )
+    
+    context = prepare_context(req, trace)
+
+    # 메인 프롬프트 컴파일
+    prompt_template = langfuse.get_prompt("followup_questions_generator")
+    prompt = prompt_template.compile(**context)
 
     try:
         # 주 질문 생성

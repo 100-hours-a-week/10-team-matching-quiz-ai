@@ -68,13 +68,14 @@ def initialize_llm():
         raise
 
 
-async def call_llm(prompt: str, try_fallback: bool = True) -> str:
+async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None) -> str:
     """
     LLM에 프롬프트를 안전하게 전송하고 생성된 응답을 반환합니다.
 
     Parameters:
         prompt (str): LLM에 전달할 텍스트 프롬프트
         try_fallback (bool): 로컬 모델 실패 시 OpenAI 기반 fallback 사용 여부
+        trace_id (str): 부모 트레이스 ID (있는 경우 사용)
 
     Returns:
         str: 모델이 생성한 응답 텍스트
@@ -90,7 +91,7 @@ async def call_llm(prompt: str, try_fallback: bool = True) -> str:
         except Exception as e:
             if try_fallback and OPENAI_API_KEY:
                 logger.warning(f"로컬 LLM 초기화 실패, OpenAI로 fallback: {e}")
-                return await call_openai_api(prompt)
+                return await call_openai_api(prompt, trace_id)
             else:
                 raise
 
@@ -111,14 +112,18 @@ async def call_llm(prompt: str, try_fallback: bool = True) -> str:
             raise
 
     try:
-        # Langfuse로 로컬 LLM 호출 추적
-        trace = langfuse.trace(name="local-llm-generation")
-        generation = langfuse.generation(
-            name="local-llm-call",
-            model=MODEL_PATH,
-            input=prompt,
-            trace_id=trace.id
-        )
+        # 부모 트레이스 ID 사용 또는 새로운 트레이스 생성
+        generation_kwargs = {
+            "name": "local-llm-call",
+            "model": MODEL_PATH,
+            "input": prompt,
+        }
+        
+        # 부모 트레이스 ID가 있으면 그것을 사용
+        if trace_id:
+            generation_kwargs["trace_id"] = trace_id
+        
+        generation = langfuse.generation(**generation_kwargs)
 
         # 타임아웃 설정으로 무한 대기 방지
         start_time = asyncio.get_event_loop().time()
@@ -133,7 +138,6 @@ async def call_llm(prompt: str, try_fallback: bool = True) -> str:
             output=result,
             metadata={"execution_time_seconds": execution_time}
         )
-        trace.end()
 
         return result
     except (asyncio.TimeoutError, Exception) as e:
@@ -145,15 +149,13 @@ async def call_llm(prompt: str, try_fallback: bool = True) -> str:
         # 에러 기록
         if locals().get('generation'):
             generation.end(error=error_message)
-        if locals().get('trace'):
-            trace.end(error=error_message)
 
         logger.error(error_message)
 
         # Fallback 로직
         if try_fallback and OPENAI_API_KEY:
             logger.info("로컬 LLM 실패, OpenAI API로 fallback")
-            return await call_openai_api(prompt)
+            return await call_openai_api(prompt, trace_id)
 
         # Fallback이 비활성화되었거나 OpenAI 키가 없는 경우 예외 발생
         if isinstance(e, asyncio.TimeoutError):
@@ -162,13 +164,14 @@ async def call_llm(prompt: str, try_fallback: bool = True) -> str:
             raise Exception(error_message)
 
 
-async def call_openai_api(prompt: str) -> str:
+async def call_openai_api(prompt: str, trace_id: str = None) -> str:
     """
     OpenAI API를 사용하여 프롬프트에 대한 응답을 생성합니다.
     주로 부족한 질문을 채우기 위한 백업 메커니즘으로 사용됩니다.
 
     Parameters:
         prompt (str): OpenAI 모델에 전달할 텍스트 프롬프트
+        trace_id (str): 부모 트레이스 ID (있는 경우 사용)
 
     Returns:
         str: 모델이 생성한 응답 텍스트
@@ -179,15 +182,21 @@ async def call_openai_api(prompt: str) -> str:
     model_name = "gpt-4o-mini"
 
     try:
-        # Langfuse로 Generation 추적 시작
-        generation = langfuse.generation(
-            name="openai-api-call",
-            model=model_name,
-            input=[
+        # 부모 트레이스 ID 사용 또는 새로운 트레이스 생성
+        generation_kwargs = {
+            "name": "openai-api-call",
+            "model": model_name,
+            "input": [
                 {"role": "system", "content": "당신은 IT 기술 면접을 위한 질문을 생성하는 도우미입니다."},
                 {"role": "user", "content": prompt}
             ],
-        )
+        }
+        
+        # 부모 트레이스 ID가 있으면 그것을 사용
+        if trace_id:
+            generation_kwargs["trace_id"] = trace_id
+            
+        generation = langfuse.generation(**generation_kwargs)
 
         # OpenAI API 호출
         response = openai_client.chat.completions.create(
