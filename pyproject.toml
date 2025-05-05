@@ -3,15 +3,17 @@ name = "10-team-matching-quiz-ai"
 version = "0.1.0"
 description = "AI 기반 면접 질문 생성, 복습 퀴즈 생성, STT 피드백 서버"
 authors = ["tykong08 <taeyoung.kong@outlook.com>"]
+package-mode = false # <-- 이 줄 추가
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = ">=3.11,<3.12"
+torch = "2.6.0" # <-- 이 줄 추가
 
 # 🔹 FastAPI + vLLM (AI 서버 및 서빙)
 fastapi = "0.115.9"
 uvicorn = "^0.29.0"
-vllm = "0.8.4"
+vllm = "0.8.5.post1" # Colab 설치 로그에서는 0.8.5.post1 이었으므로, 필요시 "0.8.5.post1"로 수정
 
 # 🔹 LangChain (체인 구성 및 RAG 연동)
 langchain = "0.3.24"
@@ -23,24 +25,24 @@ peft = "^0.10.0"
 datasets = "^2.19.0"
 
 # 🔹 STT (Whisper 기반)
-whisper = "^1.1.10"
+whisper = "^1.1.10" # openai-whisper 패키지인지 확인 필요
 
 # 🔹 벡터 DB (RAG 용)
 chromadb = "1.0.7"
 
 # 🔹 Hugging Face + Embedding model
 sentence-transformers = "^2.7.0"
-scipy = "*"
+scipy = "*" # 필요시 버전 명시 권장
 
 # 🔹 모니터링 (Langfuse + LangSmith)
 langfuse = "2.60.3"
 langsmith = "0.3.33"
 
 # 🔹 공통 유틸리티
-python-dotenv = "^1.0.1"
+python-dotenv = "^1.1.0" # Colab 로그에서는 1.1.0 이었음
 pandas = "^2.2.2"
-tqdm = "^4.66.2"
-requests = "*"
+tqdm = "^4.67.1" # Colab 로그에서는 4.67.1 이었음
+requests = "*" # 필요시 버전 명시 권장
 
 # 🔹 로깅 및 오류 처리
 loguru = "^0.7.2"
@@ -52,6 +54,12 @@ mysql-connector-python = "^8.4.0"
 # 🔹 테스트
 pytest = "^8.2.0"
 poetry-plugin-export = "^1.9.0"
+
+# Colab 로그에 있었지만 pyproject.toml에 없던 패키지들 (필요시 추가)
+# bitsandbytes = "0.45.5"
+httpx = "^0.28.1" # Colab 로그에서는 0.28.1 이었음
+tiktoken = "0.9.0"
+pydantic = "^2.11.3" # Colab 로그에서는 2.11.3 이었음
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.5"
