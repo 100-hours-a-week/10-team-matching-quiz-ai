@@ -1,8 +1,15 @@
 from sentence_transformers import SentenceTransformer
+import os # os 모듈 임포트
+import logging
+
+logger = logging.getLogger(__name__)
 
 _model = None
 
-def get_model(model_name='intfloat/e5-small-v2'):
+DEFAULT_EMBEDDING_MODEL = 'intfloat/e5-small-v2'
+EMBEDDING_MODEL_NAME = os.getenv('EMBEDDING_MODEL_NAME', DEFAULT_EMBEDDING_MODEL)
+
+def get_model(model_name=EMBEDDING_MODEL_NAME):
     global _model
     if _model is None:
         try:
