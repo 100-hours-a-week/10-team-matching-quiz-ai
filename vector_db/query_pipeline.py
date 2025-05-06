@@ -1,0 +1,30 @@
+import numpy as np
+from embedding import embed_texts
+from vector_store import collection
+
+def cosine_similarity(a, b):
+    a = np.array(a)
+    b = np.array(b)
+    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+
+def rag_retriever(main_question: str, keyword: str, top_k: int = 6, sim_threshold: float = 0.5):
+    keyword_embedding = embed_texts([keyword])[0]
+    results = collection.query(
+        query_embeddings=[keyword_embedding],
+        n_results=top_k * 2,
+        include=["documents", "embeddings"]
+    )
+
+    all_questions = results["documents"][0]
+    all_embeddings = results["embeddings"][0]
+
+    filtered = []
+    for q, q_emb in zip(all_questions, all_embeddings):
+        sim = cosine_similarity(keyword_embedding, q_emb)
+        if sim >= sim_threshold:
+            filtered.append({"question": q, "similarity": round(sim, 4)})
+
+    filtered.sort(key=lambda x: -x["similarity"])
+    return filtered[:top_k]
+
+

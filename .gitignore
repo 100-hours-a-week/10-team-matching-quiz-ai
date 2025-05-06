@@ -30,6 +30,10 @@ pip-log.txt
 # FastAPI 서버 설정파일 (개인 local secret 포함 가능성)
 *.env
 .env.*
+<<<<<<< HEAD
+=======
+.env
+>>>>>>> feature/question-generation-serving
 
 # 모델 체크포인트 / 가중치 파일
 *.ckpt
@@ -65,11 +69,22 @@ media/
 *.jsonl
 
 # 모델 결과 폴더 무시
+<<<<<<< HEAD
 models/
 fine-tuning/models/
 
 # Fine-tuning 데이터셋 결과 폴더 무시
 fine-tuning/dataset/processed/
+=======
+Training/model/
+question-generation/model
+model
+
+# Fine-tuning 데이터셋 결과 폴더 무시
+fine-tuning/dataset/processed/
+fine-tuning/dataset/raw/
+model_cache
+>>>>>>> feature/question-generation-serving
 
 # -----------------------------
 # Docker / Build 관련 무시 파일
@@ -106,3 +121,27 @@ htmlcov/
 coverage.xml
 pytest_cache/
 .tox/
+<<<<<<< HEAD
+=======
+
+# 외부 gpu연결
+cloudflared
+
+# 데이터셋
+dataset
+
+# 모델 트레이닝
+training
+
+# pyright / mypy 캐시
+.pyright/
+.mypy_cache/
+
+# MacOS 자동 백업
+*.swp
+*.tmp
+
+# 파인튜닝 중간 결과 (예: tokenizer config 등)
+*.json
+*.lock
+>>>>>>> feature/question-generation-serving
