@@ -30,10 +30,7 @@ pip-log.txt
 # FastAPI 서버 설정파일 (개인 local secret 포함 가능성)
 *.env
 .env.*
-<<<<<<< HEAD
-=======
 .env
->>>>>>> feature/question-generation-serving
 
 # 모델 체크포인트 / 가중치 파일
 *.ckpt
@@ -69,7 +66,6 @@ media/
 *.jsonl
 
 # 모델 결과 폴더 무시
-<<<<<<< HEAD
 models/
 fine-tuning/models/
 
@@ -120,8 +116,7 @@ Thumbs.db
 htmlcov/
 coverage.xml
 pytest_cache/
-.tox/
-<<<<<<< HEAD
+.tox
 =======
 
 # 외부 gpu연결
@@ -144,4 +139,3 @@ training
 # 파인튜닝 중간 결과 (예: tokenizer config 등)
 *.json
 *.lock
->>>>>>> feature/question-generation-serving
