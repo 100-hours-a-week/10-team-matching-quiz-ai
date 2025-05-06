@@ -9,7 +9,7 @@ import os
 import logging
 import uuid
 from typing import List, Dict, Any, Optional
-from vector_db.query_pipeline import rag_retriever
+# from vector_db.query_pipeline import rag_retriever
 from dotenv import load_dotenv
 
 # .env 파일 로드
@@ -69,15 +69,24 @@ def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
     # RAG 스팬 생성
     rag_span = trace.span(name="rag_retrieval")
     try:
-        rag_results = rag_retriever(
-            req.selected_question, req.keyword or "", top_k=4)
+        # ChromaDB 호출 부분 주석 처리
+        # rag_results = rag_retriever(
+        #     req.selected_question, req.keyword or "", top_k=4)
+        # rag_span.update(
+        #     input={"query": req.selected_question, "keyword": req.keyword or ""},
+        #     output={"results": rag_results})
+        # retrieved_questions = [r["question"] for r in rag_results]
+        # if retrieved_questions:
+        #     joined_rag = "\n".join(f"- {q}" for q in retrieved_questions)
+        #     retrieved_section = f"\n\n[유사한 기존 질문]\n{joined_rag}"
+
+        # RAG 검색을 사용하지 않으므로 빈 결과로 설정
         rag_span.update(
-            input={"query": req.selected_question, "keyword": req.keyword or ""},
-            output={"results": rag_results})
-        retrieved_questions = [r["question"] for r in rag_results]
-        if retrieved_questions:
-            joined_rag = "\n".join(f"- {q}" for q in retrieved_questions)
-            retrieved_section = f"\n\n[유사한 기존 질문]\n{joined_rag}"
+            input={"query": req.selected_question,
+                   "keyword": req.keyword or ""},
+            output={"results": "RAG 기능 비활성화됨"})
+        retrieved_section = ""  # RAG 결과 비활성화
+
         rag_span.end()
     except Exception as e:
         logging.warning(f"RAG 검색 실패: {e}")
@@ -178,7 +187,7 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
 
     # 트레이스 ID 생성 및 컨텍스트 준비
     trace_id = f"followup_{req.interview_id}_{uuid.uuid4().hex}"
-    
+
     trace = langfuse.trace(
         id=trace_id,
         name="followup_generation_llm",
@@ -189,7 +198,7 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
             "passed_questions": req.passed_questions or [],
         }
     )
-    
+
     context = prepare_context(req, trace)
 
     # 메인 프롬프트 컴파일
