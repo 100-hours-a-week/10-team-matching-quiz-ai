@@ -54,12 +54,12 @@ def initialize_llm():
     try:
         llm = LLM(
             model=MODEL_PATH,
-            tensor_parallel_size=1,
+            tensor_parallel_size=1, # gpu에 따라 다르지만 우선 1로 설정
             trust_remote_code=True,
             dtype=dtype,
             # quantization="bitsandbytes",  # 4비트 모델에 맞는 양자화 설정
             download_dir="./model_cache",  # 캐싱 디렉토리 설정
-            max_model_len=4096,
+            max_model_len=4096, # 모델의 크기와 응답 속도에 따라 조정
         )
         logger.info(f"Hugging Face 모델 로드 성공: {MODEL_PATH}")
         return llm

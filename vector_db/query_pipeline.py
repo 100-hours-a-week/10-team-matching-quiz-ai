@@ -1,6 +1,6 @@
 import numpy as np
-from vector_db.embedding import embed_texts
-from vector_db.vector_store import collection
+from embedding import embed_texts
+from vector_store import collection
 
 def cosine_similarity(a, b):
     a = np.array(a)
@@ -8,11 +8,9 @@ def cosine_similarity(a, b):
     return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
 
 def rag_retriever(main_question: str, keyword: str, top_k: int = 6, sim_threshold: float = 0.5):
-    query_embedding = embed_texts([main_question], keyword=keyword)[0]
     keyword_embedding = embed_texts([keyword])[0]
-
     results = collection.query(
-        query_embeddings=[query_embedding],
+        query_embeddings=[keyword_embedding],
         n_results=top_k * 2,
         include=["documents", "embeddings"]
     )

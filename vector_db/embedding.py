@@ -1,12 +1,16 @@
 from sentence_transformers import SentenceTransformer
 import os # os 모듈 임포트
 import logging
+import warnings
 
-logger = logging.getLogger(__name__)
+# transformers 관련 경고 숨기기
+logging.getLogger("transformers.modeling_utils").setLevel(logging.ERROR)
+logging.getLogger("transformers.configuration_utils").setLevel(logging.ERROR)
+warnings.filterwarnings("ignore", category=UserWarning)
 
 _model = None
 
-DEFAULT_EMBEDDING_MODEL = 'intfloat/e5-small-v2'
+DEFAULT_EMBEDDING_MODEL = 'Alibaba-NLP/gte-multilingual-base'
 EMBEDDING_MODEL_NAME = os.getenv('EMBEDDING_MODEL_NAME', DEFAULT_EMBEDDING_MODEL)
 
 def get_model(model_name=EMBEDDING_MODEL_NAME):
@@ -22,11 +26,14 @@ def get_model(model_name=EMBEDDING_MODEL_NAME):
 
 # 문장 디테일 보강
 def enrich_question(question: str, keyword: str = None):
-    if keyword:
-        return f"면접 질문: {question} 관련 키워드: {keyword}"
-    return f"면접 질문: {question}"
+    keyword = keyword.lower().strip() if keyword else ""
+    qtext = question.strip().lower()
 
-# embed_texts 내부에서 enrich_question 적용
+    enriched = f"면접 질문: {question}"
+    if keyword:
+        enriched += f" 관련 키워드: {keyword}"
+    return enriched
+
 def embed_texts(texts, keyword: str = None):
     model = get_model()
     enriched = [enrich_question(text, keyword) for text in texts]

@@ -1,14 +1,12 @@
 import chromadb
 import hashlib
 
-# ChromaDB Persistent 클라이언트
 DB_PATH = "./chroma_db"
 COLLECTION_NAME = "questions"
 
 chroma_client = chromadb.PersistentClient(path=DB_PATH)
 collection = chroma_client.get_or_create_collection(COLLECTION_NAME)
 
-# 질문 내용으로 고유 ID 생성 (해시 기반)
 def generate_id(text: str) -> str:
     return hashlib.md5(text.encode('utf-8')).hexdigest()
 
