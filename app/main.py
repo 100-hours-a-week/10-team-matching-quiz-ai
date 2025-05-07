@@ -5,6 +5,7 @@ from app.api.question_generator.question_generator_model import initialize_llm
 app = FastAPI()
 app.include_router(router)
 
+
 @app.on_event("startup")
 async def startup_event():
     initialize_llm()
