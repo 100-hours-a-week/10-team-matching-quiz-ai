@@ -86,6 +86,7 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
         Exception: LLM 호출 과정에서 발생한 예외 (fallback이 false이거나 fallback도 실패한 경우)
     """
     global llm
+
     def _generate():
         params = SamplingParams(
             temperature=0.7,
