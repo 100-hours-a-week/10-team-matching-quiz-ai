@@ -2,6 +2,14 @@ import numpy as np
 from vector_db.utils import embed_texts
 from vector_db.chroma_client import collection
 
+if __name__ != "__main__":
+    import os
+    from vector_db.init_data import init_vector_store_from_csv
+
+    current_dir = os.path.dirname(__file__)
+    csv_path = os.path.join(current_dir, "question_data.csv")
+    init_vector_store_from_csv(csv_path)
+
 def cosine_similarity(a, b):
     a = np.array(a)
     b = np.array(b)
