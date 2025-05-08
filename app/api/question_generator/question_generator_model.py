@@ -94,7 +94,7 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
             top_p=0.9,
             top_k=50,
             repetition_penalty=1.15,
-            max_tokens=200,
+            max_tokens=150,
             stop=['질문 5.', '질문 6.']
         )
         try:
