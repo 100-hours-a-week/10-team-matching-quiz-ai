@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 
 class FollowupRequest(BaseModel):
-    interview_id: int
+    interview_id: str
     selected_question: str
     keyword: Optional[str] = None
     passed_questions: List[str] = []
@@ -11,5 +11,5 @@ class FollowupRequest(BaseModel):
 
 class FollowupResponse(BaseModel):
     message: str
-    interview_id: int
+    interview_id: str
     followup_questions: List[str]

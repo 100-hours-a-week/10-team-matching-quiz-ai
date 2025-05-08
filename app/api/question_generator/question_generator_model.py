@@ -86,15 +86,6 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
         Exception: LLM 호출 과정에서 발생한 예외 (fallback이 false이거나 fallback도 실패한 경우)
     """
     global llm
-    if llm is None:
-        try:
-            llm = initialize_llm()
-        except Exception as e:
-            if try_fallback and OPENAI_API_KEY:
-                logger.warning(f"로컬 LLM 초기화 실패, OpenAI로 fallback: {e}")
-                return await call_openai_api(prompt, trace_id)
-            else:
-                raise
 
     def _generate():
         params = SamplingParams(

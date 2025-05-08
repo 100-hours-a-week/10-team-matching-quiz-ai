@@ -13,6 +13,8 @@ __pycache__/
 venv/
 env/
 .venv/
+.tmp.driveupload
+.tmp.drivedownload
 
 # 패키지 관리 파일
 pip-log.txt

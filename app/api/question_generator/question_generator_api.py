@@ -46,7 +46,7 @@ def validate_request(req: FollowupRequest) -> None:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="메인 질문은 비워둘 수 없습니다."
         )
-    if req.interview_id <= 0:
+    if not req.interview_id or not req.interview_id.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="유효한 interview_id가 필요합니다."
