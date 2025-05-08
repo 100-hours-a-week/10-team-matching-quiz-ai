@@ -6,7 +6,7 @@ class FollowupRequest(BaseModel):
     interview_id: str
     selected_question: str
     keyword: Optional[str] = None
-    passed_questions: List[str] = []
+    passed_questions: Optional[List[str]] = None
 
 
 class FollowupResponse(BaseModel):
