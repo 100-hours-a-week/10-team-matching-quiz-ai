@@ -43,6 +43,7 @@ dtype = os.getenv("DTYPE", "auto")  # 모델의 dtype, 기본은 auto로 설정
 # 문자열을 float로 변환, 타임아웃 설정으로 무한 대기 방지
 timeout = float(os.getenv("LLM_TIMEOUT", "60.0"))
 
+
 # 지연 초기화를 위한 전역 변수
 llm = None
 
@@ -61,7 +62,7 @@ def initialize_llm():
             dtype=dtype,
             # quantization="bitsandbytes",  # 4비트 모델에 맞는 양자화 설정 -> vllm에서는 현재 불가능
             download_dir="./model_cache",  # 캐싱 디렉토리 설정
-            max_model_len=4096,  # 모델의 크기와 응답 속도에 따라 조정
+            max_model_len=2048,  # 모델의 크기와 응답 속도에 따라 조정
         )
         logger.info(f"Hugging Face 모델 로드 성공: {MODEL_PATH}")
         return llm
@@ -93,7 +94,7 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
             top_p=0.9,
             top_k=50,
             repetition_penalty=1.15,
-            max_tokens=400,
+            max_tokens=200,
             stop=['질문 5.', '질문 6.']
         )
         try:
