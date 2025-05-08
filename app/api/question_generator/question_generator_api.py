@@ -177,6 +177,8 @@ async def generate_additional_questions(
 
 @router.post("/followup-questions", response_model=FollowupResponse)
 async def generate_followup(req: FollowupRequest) -> FollowupResponse:
+    logger.info(
+        f"요청 받음: interview_id={req.interview_id}, req_data={req.dict()}")
     # 입력값 검증
     validate_request(req)
 
@@ -220,6 +222,8 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
         # 결과 기록
         trace.update(output={"followup_questions": generated_questions})
         # trace.end()
+        logger.info(
+            f"응답 반환: interview_id={req.interview_id}, questions_count={len(generated_questions)}")
 
         return FollowupResponse(
             message="followup_questions_generated",
