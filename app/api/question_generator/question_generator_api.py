@@ -177,6 +177,7 @@ async def generate_additional_questions(
 
 @router.post("/followup-questions", response_model=FollowupResponse)
 async def generate_followup(req: FollowupRequest) -> FollowupResponse:
+    logger.info(f"{req} 핸들러 도달 확인")
     logger.info(
         f"요청 받음: interview_id={req.interview_id}, req_data={req.dict()}")
     # 입력값 검증
