@@ -59,7 +59,7 @@ def initialize_llm():
         enforce_eager_env = os.getenv(
             "VLLM_ENFORCE_EAGER", "False").lower() == "true"
         # quantization_env = os.getenv(
-            # "VLLM_QUANTIZATION", None)  # 예: "awq" 또는 "gptq"
+        # "VLLM_QUANTIZATION", None)  # 예: "awq" 또는 "gptq"
 
         llm = LLM(
             model=MODEL_PATH,
