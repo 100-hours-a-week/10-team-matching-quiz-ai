@@ -5,7 +5,7 @@ import logging
 from vllm import LLM, SamplingParams
 from langfuse import Langfuse
 import os
-from typing import Optional, Union, Dict, Any
+from typing import Optional, Union, Dict, Any, List
 from huggingface_hub import login
 from openai import OpenAI
 from dotenv import load_dotenv
@@ -23,9 +23,7 @@ if HF_TOKEN:
     except Exception as e:
         logger.warning(f"Failed to login to Hugging Face Hub: {e}")
 
-MODEL_PATH = os.getenv(
-    "LLM_MODEL_PATH")
-
+MODEL_PATH = os.getenv("LLM_MODEL_PATH")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -34,14 +32,6 @@ langfuse = Langfuse(
     public_key=os.getenv('LANGFUSE_PUBLIC_KEY'),
     host=os.getenv('LANGFUSE_HOST')
 )
-
-# mac 구현용 코드 - 4비트 모델을 사용할 경우 dtype 설정이 중요함
-# use_mps = torch.backends.mps.is_available()
-# dtype = "float16" if use_mps and torch.backends.mps.is_built() else "float32"
-
-dtype = os.getenv("DTYPE", "auto")  # 모델의 dtype, 기본은 auto로 설정
-# 문자열을 float로 변환, 타임아웃 설정으로 무한 대기 방지
-timeout = float(os.getenv("LLM_TIMEOUT", "60.0"))
 
 # 지연 초기화를 위한 전역 변수
 llm = None
@@ -54,16 +44,44 @@ def initialize_llm():
         return llm
 
     try:
+        dtype_env = os.getenv("DTYPE", "auto")
+        tensor_parallel_size_env = int(
+            os.getenv("VLLM_TENSOR_PARALLEL_SIZE", "1"))
+        trust_remote_code_env = os.getenv(
+            "VLLM_TRUST_REMOTE_CODE", "True").lower() == "true"
+        download_dir_env = os.getenv("VLLM_DOWNLOAD_DIR", "./model_cache")
+        max_model_len_env = int(os.getenv("VLLM_MAX_MODEL_LEN", "2048"))
+        gpu_memory_utilization_env = float(
+            os.getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.9"))
+        max_num_batched_tokens_env = int(
+            os.getenv("VLLM_MAX_NUM_BATCHED_TOKENS", "4096"))
+        max_num_seqs_env = int(os.getenv("VLLM_MAX_NUM_SEQS", "256"))
+        enforce_eager_env = os.getenv(
+            "VLLM_ENFORCE_EAGER", "False").lower() == "true"
+        # quantization_env = os.getenv(
+        # "VLLM_QUANTIZATION", None)  # 예: "awq" 또는 "gptq"
+
         llm = LLM(
             model=MODEL_PATH,
-            tensor_parallel_size=1,  # gpu에 따라 다르지만 우선 1로 설정
-            trust_remote_code=True,
-            dtype=dtype,
-            # quantization="bitsandbytes",  # 4비트 모델에 맞는 양자화 설정 -> vllm에서는 현재 불가능
-            download_dir="./model_cache",  # 캐싱 디렉토리 설정
-            max_model_len=4096,  # 모델의 크기와 응답 속도에 따라 조정
+            tensor_parallel_size=tensor_parallel_size_env,
+            trust_remote_code=trust_remote_code_env,
+            dtype=dtype_env,
+            # quantization=quantization_env,  # 양자화 설정이 필요한 경우 주석 해제
+            download_dir=download_dir_env,
+            max_model_len=max_model_len_env,
+            gpu_memory_utilization=gpu_memory_utilization_env,
+            max_num_batched_tokens=max_num_batched_tokens_env,
+            max_num_seqs=max_num_seqs_env,
+            enforce_eager=enforce_eager_env
         )
-        logger.info(f"Hugging Face 모델 로드 성공: {MODEL_PATH}")
+        logger.info(
+            f"Hugging Face 모델 로드 성공: {MODEL_PATH} with params: "
+            f"dtype={dtype_env}, tensor_parallel_size={tensor_parallel_size_env}, "
+            f"trust_remote_code={trust_remote_code_env}, download_dir='{download_dir_env}', "
+            f"max_model_len={max_model_len_env}, gpu_memory_utilization={gpu_memory_utilization_env}, "
+            f"max_num_batched_tokens={max_num_batched_tokens_env}, max_num_seqs={max_num_seqs_env}, "
+            f"enforce_eager={enforce_eager_env}"
+        )
         return llm
     except Exception as e:
         logger.error(f"Hugging Face 모델 로드 실패: {e}")
@@ -88,13 +106,24 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
     global llm
 
     def _generate():
+        temperature_env = float(os.getenv("VLLM_SAMPLING_TEMPERATURE", "0.7"))
+        top_p_env = float(os.getenv("VLLM_SAMPLING_TOP_P", "0.9"))
+        top_k_env = int(os.getenv("VLLM_SAMPLING_TOP_K", "50"))
+        repetition_penalty_env = float(
+            os.getenv("VLLM_SAMPLING_REPETITION_PENALTY", "1.15"))
+        max_tokens_env = int(os.getenv("VLLM_SAMPLING_MAX_TOKENS", "150"))
+        stop_sequences_str = os.getenv(
+            "VLLM_SAMPLING_STOP_SEQUENCES", "질문 5.,질문 6.")
+        stop_sequences_env = [seq.strip() for seq in stop_sequences_str.split(
+            ',') if seq.strip()] if stop_sequences_str else []
+
         params = SamplingParams(
-            temperature=0.7,
-            top_p=0.9,
-            top_k=50,
-            repetition_penalty=1.15,
-            max_tokens=400,
-            stop=['질문 5.', '질문 6.']
+            temperature=temperature_env,
+            top_p=top_p_env,
+            top_k=top_k_env,
+            repetition_penalty=repetition_penalty_env,
+            max_tokens=max_tokens_env,
+            stop=stop_sequences_env
         )
         try:
             outputs = llm.generate([prompt], params)
@@ -104,30 +133,36 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
             raise
 
     try:
-        # 부모 트레이스 ID 사용 또는 새로운 트레이스 생성
         generation_kwargs = {
             "name": "local-llm-call",
             "model": MODEL_PATH,
             "input": prompt,
+            "metadata": {
+                "temperature": float(os.getenv("VLLM_SAMPLING_TEMPERATURE", "0.7")),
+                "top_p": float(os.getenv("VLLM_SAMPLING_TOP_P", "0.9")),
+                "top_k": int(os.getenv("VLLM_SAMPLING_TOP_K", "50")),
+                "repetition_penalty": float(os.getenv("VLLM_SAMPLING_REPETITION_PENALTY", "1.15")),
+                "max_tokens": int(os.getenv("VLLM_SAMPLING_MAX_TOKENS", "150")),
+            }
         }
 
-        # 부모 트레이스 ID가 있으면 그것을 사용
         if trace_id:
             generation_kwargs["trace_id"] = trace_id
 
         generation = langfuse.generation(**generation_kwargs)
 
         start_time = asyncio.get_event_loop().time()
+        timeout = float(os.getenv("LLM_TIMEOUT", "60.0"))
         result = await asyncio.wait_for(
             asyncio.to_thread(_generate),
             timeout=timeout
         )
         execution_time = asyncio.get_event_loop().time() - start_time
 
-        # 성공 결과 기록
         generation.end(
             output=result,
-            metadata={"execution_time_seconds": execution_time}
+            metadata={"execution_time_seconds": execution_time,
+                      **generation_kwargs["metadata"]}
         )
 
         return result
@@ -137,18 +172,19 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
         error_message = "LLM 응답 시간 초과" if isinstance(
             e, asyncio.TimeoutError) else f"LLM 호출 실패: {str(e)}"
 
-        # 에러 기록
-        if locals().get('generation'):
-            generation.end(error=error_message)
+        if 'generation' in locals() and generation:  # generation 객체가 생성되었는지 확인
+            generation.end(
+                error=error_message,
+                metadata=generation_kwargs.get(
+                    "metadata", {})  # 에러 시에도 메타데이터 기록
+            )
 
         logger.error(error_message)
 
-        # Fallback 로직
         if try_fallback and OPENAI_API_KEY:
             logger.info("로컬 LLM 실패, OpenAI API로 fallback")
             return await call_openai_api(prompt, trace_id)
 
-        # Fallback이 비활성화되었거나 OpenAI 키가 없는 경우 예외 발생
         if isinstance(e, asyncio.TimeoutError):
             raise TimeoutError(error_message)
         else:
@@ -173,7 +209,6 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
     model_name = "gpt-4o-mini"
 
     try:
-        # 부모 트레이스 ID 사용 또는 새로운 트레이스 생성
         generation_kwargs = {
             "name": "openai-api-call",
             "model": model_name,
@@ -183,13 +218,11 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
             ],
         }
 
-        # 부모 트레이스 ID가 있으면 그것을 사용
         if trace_id:
             generation_kwargs["trace_id"] = trace_id
 
         generation = langfuse.generation(**generation_kwargs)
 
-        # OpenAI API 호출
         response = openai_client.chat.completions.create(
             model=model_name,
             messages=[
@@ -201,21 +234,16 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
             top_p=0.95
         )
 
-        # 토큰 사용량 및 비용 계산
         input_tokens = response.usage.prompt_tokens
         output_tokens = response.usage.completion_tokens
-
-        # OpenAI의 gpt-4o-mini 모델 요금
-        cost_per_1k_input = 0.00015  # $0.00015 per 1K input tokens
-        cost_per_1k_output = 0.0006   # $0.0006 per 1K output tokens
+        cost_per_1k_input = 0.00015
+        cost_per_1k_output = 0.0006
         cost = (input_tokens / 1000 * cost_per_1k_input) + \
             (output_tokens / 1000 * cost_per_1k_output)
 
-        # 상세 로깅
         logger.info(
             f"OpenAI API 호출 성공: 입력 토큰 {input_tokens}, 출력 토큰 {output_tokens}, 비용 ${cost:.5f}")
 
-        # Langfuse에 사용량 및 비용 업데이트
         generation.end(
             output=response.choices[0].message.content,
             usage_details={
@@ -232,8 +260,7 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
 
         return response.choices[0].message.content
     except Exception as e:
-        # 에러가 발생한 경우에도 Langfuse에 기록
-        if locals().get('generation'):
+        if 'generation' in locals() and generation:  # generation 객체가 생성되었는지 확인
             generation.end(error=str(e))
         logger.error(f"OpenAI API 호출 오류: {e}")
         raise
