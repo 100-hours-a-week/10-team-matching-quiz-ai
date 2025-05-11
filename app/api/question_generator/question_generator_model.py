@@ -58,15 +58,15 @@ def initialize_llm():
         max_num_seqs_env = int(os.getenv("VLLM_MAX_NUM_SEQS", "256"))
         enforce_eager_env = os.getenv(
             "VLLM_ENFORCE_EAGER", "False").lower() == "true"
-        quantization_env = os.getenv(
-            "VLLM_QUANTIZATION", None)  # 예: "awq" 또는 "gptq"
+        # quantization_env = os.getenv(
+        #     "VLLM_QUANTIZATION", None)  # 예: "awq" 또는 "gptq"
 
         llm = LLM(
             model=MODEL_PATH,
             tensor_parallel_size=tensor_parallel_size_env,
             trust_remote_code=trust_remote_code_env,
             dtype=dtype_env,
-            quantization=quantization_env,  # 양자화 설정이 필요한 경우 주석 해제
+            # quantization=quantization_env,  # 양자화 설정이 필요한 경우 주석 해제
             download_dir=download_dir_env,
             max_model_len=max_model_len_env,
             gpu_memory_utilization=gpu_memory_utilization_env,
