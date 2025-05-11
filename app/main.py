@@ -8,21 +8,6 @@ import logging
 app = FastAPI()
 app.include_router(router)
 
-# logger 객체 생성
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    body = await request.body()
-    logger.warning(
-        f"[422 Error] Validation failed: {exc.errors()} | Body: {body.decode()}")
-    return JSONResponse(
-        status_code=422,
-        content={"detail": exc.errors()}
-    )
-
 
 @app.on_event("startup")
 async def startup_event():
