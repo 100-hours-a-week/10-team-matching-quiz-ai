@@ -5,11 +5,8 @@ from typing import List, Pattern, Tuple, Dict, Set, Optional
 
 logger = logging.getLogger(__name__)
 
-# ── 상수 ─────────────────────────────────────────────────────────
 _BRACKETS: Dict[str, str] = {'(': ')', '[': ']', '{': '}'}
 _QUOTES: Set[str] = {'"', "'", '“', '”', '‘', '’'}
-
-# ── 텍스트 유틸 ──────────────────────────────────────────────────
 
 
 def _fix(text: str) -> str:
@@ -44,7 +41,6 @@ def _strip_md(s: str) -> str:
     return re.sub(r'(\*\*|\*|`|#+)', '', s)
 
 
-# ── 질문 패턴 ────────────────────────────────────────────────────
 _NEXT = (
     r"\n\s*(?:"
     r"-?\s*(?:질문|문제|Question)\s+\d+\.?\:?|"
