@@ -73,7 +73,7 @@ def initialize_llm():
             quantization=quantization_env,  # 양자화 설정이 필요한 경우 주석 해제
             download_dir=download_dir_env,
             max_model_len=max_model_len_env,
-            gpu_memory_utilization=0.8,
+            gpu_memory_utilization=gpu_memory_utilization_env,
             max_num_batched_tokens=max_num_batched_tokens_env,
             max_num_seqs=max_num_seqs_env,
             enforce_eager=enforce_eager_env
