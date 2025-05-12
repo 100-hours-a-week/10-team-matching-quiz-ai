@@ -74,7 +74,7 @@ def initialize_llm():
             # load_format="bitsandbytes",
             download_dir=download_dir_env,
             max_model_len=max_model_len_env,
-            gpu_memory_utilization=gpu_memory_utilization_env,
+            gpu_memory_utilization=0.8,
             max_num_batched_tokens=max_num_batched_tokens_env,
             max_num_seqs=max_num_seqs_env,
             enforce_eager=enforce_eager_env
