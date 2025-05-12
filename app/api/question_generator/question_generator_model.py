@@ -71,7 +71,6 @@ def initialize_llm():
             trust_remote_code=trust_remote_code_env,
             dtype=dtype_env,
             quantization=quantization_env,  # 양자화 설정이 필요한 경우 주석 해제
-            # load_format="bitsandbytes",
             download_dir=download_dir_env,
             max_model_len=max_model_len_env,
             gpu_memory_utilization=0.8,
