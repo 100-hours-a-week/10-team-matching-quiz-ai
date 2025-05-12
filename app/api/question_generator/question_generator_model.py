@@ -37,6 +37,10 @@ langfuse = Langfuse(
 llm = None
 
 
+def str2bool(value: str) -> bool:
+    return value.lower() in ("true", "1", "yes")
+
+
 def initialize_llm():
     """LLM을 초기화하는 함수 - 처음에 실행할때만 호출"""
     global llm
@@ -45,10 +49,11 @@ def initialize_llm():
 
     try:
         dtype_env = os.getenv("DTYPE", "auto")
+        peft_path = os.getenv("VLLM_PEFT_MODEL", None)
         tensor_parallel_size_env = int(
             os.getenv("VLLM_TENSOR_PARALLEL_SIZE", "1"))
-        trust_remote_code_env = os.getenv(
-            "VLLM_TRUST_REMOTE_CODE", "True").lower() == "true"
+        trust_remote_code_env = str2bool(
+            os.getenv("VLLM_TRUST_REMOTE_CODE", "True"))
         download_dir_env = os.getenv("VLLM_DOWNLOAD_DIR", "./model_cache")
         max_model_len_env = int(os.getenv("VLLM_MAX_MODEL_LEN", "2048"))
         gpu_memory_utilization_env = float(
@@ -56,17 +61,19 @@ def initialize_llm():
         max_num_batched_tokens_env = int(
             os.getenv("VLLM_MAX_NUM_BATCHED_TOKENS", "4096"))
         max_num_seqs_env = int(os.getenv("VLLM_MAX_NUM_SEQS", "256"))
-        enforce_eager_env = os.getenv(
-            "VLLM_ENFORCE_EAGER", "False").lower() == "true"
-        # quantization_env = os.getenv(
-        #     "VLLM_QUANTIZATION", None)  # 예: "awq" 또는 "gptq"
+        enforce_eager_env = str2bool(os.getenv("VLLM_ENFORCE_EAGER", "False"))
+        quantization_env = os.getenv(
+            "VLLM_QUANTIZATION", None)  # 예: "awq" 또는 "gptq"
+        load_format_env = os.getenv("VLLM_LOAD_FORMAT", None)
 
         llm = LLM(
             model=MODEL_PATH,
+            peft_model=peft_path,
             tensor_parallel_size=tensor_parallel_size_env,
             trust_remote_code=trust_remote_code_env,
             dtype=dtype_env,
             # quantization=quantization_env,  # 양자화 설정이 필요한 경우 주석 해제
+            # load_format="bitsandbytes",
             download_dir=download_dir_env,
             max_model_len=max_model_len_env,
             gpu_memory_utilization=gpu_memory_utilization_env,

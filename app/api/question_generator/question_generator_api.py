@@ -96,7 +96,7 @@ def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
         "keyword": req.keyword or "",
         "passed_questions": passed_section,
         "retrieved_questions": retrieved_section,
-        "num_num_questions": GENERATE_COUNT,
+        "num_questions": GENERATE_COUNT,
     }
 
 
@@ -238,5 +238,5 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
         logger.error(f"꼬리 질문 생성 실패: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"처리 실패: {str(e)}"
+            detail=f"꼬리 질문 생성 실패: {str(e)}"
         )
