@@ -36,6 +36,7 @@ langfuse = Langfuse(
 # 지연 초기화를 위한 전역 변수
 llm = None
 
+
 def str2bool(value: str) -> bool:
     return value.lower() in ("true", "1", "yes")
 
@@ -48,10 +49,11 @@ def initialize_llm():
 
     try:
         dtype_env = os.getenv("DTYPE", "auto")
-        peft_path = os.getenv("VLLM_PEFT_MODEL",None)
+        peft_path = os.getenv("VLLM_PEFT_MODEL", None)
         tensor_parallel_size_env = int(
             os.getenv("VLLM_TENSOR_PARALLEL_SIZE", "1"))
-        trust_remote_code_env = str2bool(os.getenv("VLLM_TRUST_REMOTE_CODE", "True"))
+        trust_remote_code_env = str2bool(
+            os.getenv("VLLM_TRUST_REMOTE_CODE", "True"))
         download_dir_env = os.getenv("VLLM_DOWNLOAD_DIR", "./model_cache")
         max_model_len_env = int(os.getenv("VLLM_MAX_MODEL_LEN", "2048"))
         gpu_memory_utilization_env = float(
@@ -66,11 +68,12 @@ def initialize_llm():
 
         llm = LLM(
             model=MODEL_PATH,
+            peft_model=peft_path,
             tensor_parallel_size=tensor_parallel_size_env,
             trust_remote_code=trust_remote_code_env,
             dtype=dtype_env,
             # quantization=quantization_env,  # 양자화 설정이 필요한 경우 주석 해제
-            # load_format="bitsandbytes",            
+            # load_format="bitsandbytes",
             download_dir=download_dir_env,
             max_model_len=max_model_len_env,
             gpu_memory_utilization=gpu_memory_utilization_env,
