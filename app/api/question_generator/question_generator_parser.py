@@ -43,7 +43,7 @@ def _strip_md(s: str) -> str:
 
 _NEXT = (
     r"\n\s*(?:"
-    r"-?\s*(?:질문|문제|Question)\s+\d+\.?\:?|"
+    r"-?\s*(?:질문|문제|Question|꼬리질문)\s+\d+\.?\:?|"
     r"Q\s*\d+\.?\:?|"
     r"\d+\.\s+|"
     r"\d+\)\s+|"
@@ -53,8 +53,8 @@ _NEXT = (
 
 _PATS: Tuple[Pattern[str], ...] = tuple(
     re.compile(p, re.M | re.S) for p in (
-        rf"^\s*(?:질문|문제)\s+\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
-        rf"^\s*###\s*질문\s+\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
+        rf"^\s*(?:질문|문제|꼬리질문)\s+\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
+        rf"^\s*###\s*(?:질문|꼬리질문)\s+\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
         rf"^\s*Q\s*\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
         rf"^\s*Question\s+\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
         rf"^\s*\d+\.\s+(.+?)(?={_NEXT}|\Z)",

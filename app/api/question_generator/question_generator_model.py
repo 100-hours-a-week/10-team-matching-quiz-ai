@@ -49,7 +49,6 @@ def initialize_llm():
 
     try:
         dtype_env = os.getenv("DTYPE", "auto")
-        peft_path = os.getenv("VLLM_PEFT_MODEL", None)
         tensor_parallel_size_env = int(
             os.getenv("VLLM_TENSOR_PARALLEL_SIZE", "1"))
         trust_remote_code_env = str2bool(
@@ -64,15 +63,14 @@ def initialize_llm():
         enforce_eager_env = str2bool(os.getenv("VLLM_ENFORCE_EAGER", "False"))
         quantization_env = os.getenv(
             "VLLM_QUANTIZATION", None)  # 예: "awq" 또는 "gptq"
-        load_format_env = os.getenv("VLLM_LOAD_FORMAT", None)
+        # load_format_env = os.getenv("VLLM_LOAD_FORMAT", None)
 
         llm = LLM(
             model=MODEL_PATH,
-            peft_model=peft_path,
             tensor_parallel_size=tensor_parallel_size_env,
             trust_remote_code=trust_remote_code_env,
             dtype=dtype_env,
-            # quantization=quantization_env,  # 양자화 설정이 필요한 경우 주석 해제
+            quantization=quantization_env,  # 양자화 설정이 필요한 경우 주석 해제
             # load_format="bitsandbytes",
             download_dir=download_dir_env,
             max_model_len=max_model_len_env,
