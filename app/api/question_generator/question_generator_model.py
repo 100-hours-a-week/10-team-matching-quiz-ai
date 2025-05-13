@@ -47,6 +47,8 @@ def initialize_llm():
     if llm is not None:
         return llm
 
+    os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
+
     try:
         dtype_env = os.getenv("DTYPE", "auto")
         tensor_parallel_size_env = int(
