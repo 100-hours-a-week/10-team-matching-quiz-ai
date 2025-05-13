@@ -5,7 +5,6 @@ from typing import List, Dict
 import logging
 
 def cosine_similarity_gpu(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
-    """정규화된 텐서들 간의 코사인 유사도 계산 (1:N)"""
     a = a / torch.norm(a, dim=-1, keepdim=True)
     b = b / torch.norm(b, dim=-1, keepdim=True)
     return torch.matmul(a, b.T)  
