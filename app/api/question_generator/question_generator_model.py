@@ -47,6 +47,8 @@ def initialize_llm():
     if llm is not None:
         return llm
 
+    os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
+
     try:
         dtype_env = os.getenv("DTYPE", "auto")
         tensor_parallel_size_env = int(
@@ -71,10 +73,10 @@ def initialize_llm():
             trust_remote_code=trust_remote_code_env,
             dtype=dtype_env,
             quantization=quantization_env,  # 양자화 설정이 필요한 경우 주석 해제
+            # load_format="bitsandbytes",
             download_dir=download_dir_env,
             max_model_len=max_model_len_env,
             gpu_memory_utilization=gpu_memory_utilization_env,
-            max_num_batched_tokens=max_num_batched_tokens_env,
             max_num_seqs=max_num_seqs_env,
             enforce_eager=enforce_eager_env
         )

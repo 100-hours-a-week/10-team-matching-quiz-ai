@@ -36,7 +36,7 @@ langfuse = Langfuse(
 
 # 상수 정의
 GENERATE_COUNT = 4  # 생성할 질문의 수
-MAX_HISTORY_QUESTIONS = 20  # 계속 재생성을 클릭시 앞의 20개로 제한을 하는 코드
+MAX_HISTORY_QUESTIONS = int(os.getenv('MAX_HISTORY_QUESTIONS', 20))
 
 
 def validate_request(req: FollowupRequest) -> None:

@@ -1,159 +1,57 @@
 import re
 import unicodedata
 import logging
-from typing import List, Pattern, Tuple, Dict, Set, Optional
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
-
-_BRACKETS: Dict[str, str] = {'(': ')', '[': ']', '{': '}'}
-_QUOTES: Set[str] = {'"', "'", '“', '”', '‘', '’'}
-
-
-def _fix(text: str) -> str:
-    stk: List[str] = []
-    for ch in text:
-        if ch in _BRACKETS:
-            stk.append(ch)
-        elif stk and ch == _BRACKETS.get(stk[-1], ''):
-            stk.pop()
-    if stk:
-        pos = text.rfind('\n')
-        pos = pos + 1 if pos != -1 else len(text)
-        text = text[:pos] + ''.join(_BRACKETS[b]
-                                    for b in reversed(stk)) + text[pos:]
-    for q in _QUOTES:
-        if text.count(q) % 2 != 0:
-            text += q
-    return text
 
 
 def _norm(text: str) -> str:
     text = unicodedata.normalize("NFC", text)
-    text = re.sub(r'\s+', ' ', text).strip()
-    if not re.search(r'[\.\!\?…\"\'\)\]\}]$', text):
-        text += '.'
+    text = re.sub(r"\s+", " ", text).strip()
+    if not re.search(r"[\.\!\?…]$", text):
+        text += "."
     return text
 
 
 def _strip_md(s: str) -> str:
-    s = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', s)
-    s = re.sub(r'~~([^~]+)~~', r'\1', s)
-    return re.sub(r'(\*\*|\*|`|#+)', '', s)
-
-
-_NEXT = (
-    r"\n\s*(?:"
-    r"-?\s*(?:질문|문제|Question|꼬리질문)\s+\d+\.?\:?|"
-    r"Q\s*\d+\.?\:?|"
-    r"\d+\.\s+|"
-    r"\d+\)\s+|"
-    r"###\s*Question\s+\d+\:?|"
-    r"###)"
-)
-
-_PATS: Tuple[Pattern[str], ...] = tuple(
-    re.compile(p, re.M | re.S) for p in (
-        rf"^\s*(?:질문|문제|꼬리질문)\s+\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
-        rf"^\s*###\s*(?:질문|꼬리질문)\s+\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
-        rf"^\s*Q\s*\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
-        rf"^\s*Question\s+\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
-        rf"^\s*\d+\.\s+(.+?)(?={_NEXT}|\Z)",
-        rf"^\s*\d+\)\s+(.+?)(?={_NEXT}|\Z)",
-        rf"^\s*###\s*Question\s+\d+\:?\s*(.+?)(?={_NEXT}|\Z)",
-    )
-)
-
-_META_PATTERNS = [
-    r'^\s*\[.+?\]:\s*.+$',
-    r'^\s*\*\*\[.+?\]\*\*:.*$',
-    r'^\s*\[.+?\]$',
-    r'^\s*\*\*\[.+?\]\*\*$',
-    r'^\s*#+ .+$',
-    r'^\s*\*\*.+?\*\*$',
-    r'^\s*-\s+.*',
-    r'^.*사용자.*정보.*$',
-    r'^.*지원자.*답변.*$',
-    r'^.*메인.*질문.*$',
-    r'^.*사용자.*키워드.*$',
-    r'^.*이전.*질문.*목록.*$',
-    r'^.*참고.*질문.*목록.*$',
-]
-
-_QUESTION_HINTS = (
-    r'\?'
-    r'|무엇|어떻게|어디서|언제|누구|왜|어떤'
-    r'|차이점|비교|장단점'
-    r'|설명(?:해|하)[가-힣]*'
-    r'|말씀(?:해|해줄)[가-힣]*'
-    r'|주세요'
-)
-
-
-def is_likely_question(text: str) -> bool:
-    if any(re.search(p, text, re.I) for p in _META_PATTERNS):
-        return False
-    if len(text.strip()) < 10:
-        return False
-    return bool(re.search(_QUESTION_HINTS, text))
+    s = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", s)
+    s = re.sub(r"~~([^~]+)~~", r"\1", s)
+    s = re.sub(r"(\*\*|\*|_|`|#+)", "", s)
+    return s.strip()
 
 
 def korean_char_length(text: str) -> int:
-    return sum(1 for _ in text)
+    return len(text)
 
 
 def parse_questions(
     text: str,
-    extra_pats: Optional[List[Pattern[str]]] = None,
     strip_md: bool = True,
 ) -> List[str]:
-    txt = text.replace("\n...\n[출력 형식 예시]", "").strip()
-    if txt.endswith("\nassistant"):
-        txt = txt[: -len("\nassistant")]
+    parsed_questions: List[str] = []
+    lines = text.split("\n")
 
-    msec = re.search(r'##\s*\S*생성\s*결과[^\n]*', txt)
-    if msec:
-        txt = txt[msec.start():]
+    for line in lines:
+        line = line.strip()
+        match = re.match(
+            r"^(?:질문|문제|꼬리질문|꼬리\s*질문|Question|Q)\s*\d+\s*\.\s*(.+)", line, re.IGNORECASE
+        )
+        if match:
+            question_text = match.group(1).strip()
 
-    m = re.search(r'(?:질문|문제|Question|Q)\s*\d+\.?|###\s*질문', txt)
-    if m:
-        txt = txt[m.start():]
+            if strip_md:
+                question_text = _strip_md(question_text)
 
-    if len(txt) < 5:
-        raise ValueError("텍스트가 너무 짧습니다")
+            question_text = _norm(question_text)
 
-    pats = list(_PATS) + (extra_pats or [])
-    spans: List[Tuple[int, int, str]] = []
-    for p in pats:
-        for m in p.finditer(txt):
-            spans.append((m.start(1), m.end(1), m.group(1).strip()))
+            if korean_char_length(question_text) <= 100:
+                parsed_questions.append(question_text)
+            else:
+                logger.warning(
+                    f"질문이 100자를 초과하여 제외됩니다 (길이: {korean_char_length(question_text)}): {question_text}"
+                )
+        elif line and not re.match(r"^\s*$", line):
+            logger.debug(f"질문 형식에 맞지 않는 라인입니다: {line}")
 
-    if not spans:
-        logger.info("패턴 매칭 실패, 휴리스틱 사용")
-        questions: List[str] = []
-        for line in txt.split('\n'):
-            line = line.strip()
-            if len(line) > 15 and is_likely_question(line) and korean_char_length(line) <= 100:
-                questions.append(_norm(_fix(line)))
-        return questions
-
-    spans.sort(key=lambda x: (x[0], -(x[1] - x[0])))
-    qs: List[str] = []
-    seen: Set[str] = set()
-    end = -1
-    for s, e, raw in spans:
-        if s < end:
-            continue
-        end = e
-        q = raw
-        if strip_md:
-            q = _strip_md(q)
-        q = q.strip().rstrip(',. ')
-        if len(q) < 10 or q in seen:
-            continue
-        q = _norm(_fix(q))
-        if korean_char_length(q) > 100:
-            continue
-        if is_likely_question(q):
-            qs.append(q)
-            seen.add(q)
-    return qs
+    return parsed_questions
