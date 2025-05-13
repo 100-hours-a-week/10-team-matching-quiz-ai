@@ -4,7 +4,7 @@ from vector_db.chroma_client import collection
 from typing import List, Dict
 import logging
 
-def cosine_similarity_gpu(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+def cosine_similarity(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
     a = a / torch.norm(a, dim=-1, keepdim=True)
     b = b / torch.norm(b, dim=-1, keepdim=True)
     return torch.matmul(a, b.T)  
@@ -35,7 +35,7 @@ def rag_retriever(
 
         embedding_tensor = torch.tensor(embs, dtype=torch.float32, device=device)
 
-        similarities = cosine_similarity_gpu(keyword_tensor, embedding_tensor).squeeze(0)
+        similarities = cosine_similarity(keyword_tensor, embedding_tensor).squeeze(0)
 
         top_sim_values, top_indices = similarities.topk(k=top_k * 2)
 
