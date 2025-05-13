@@ -15,6 +15,8 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
+
 HF_TOKEN = os.getenv("HF_TOKEN")
 if HF_TOKEN:
     try:
@@ -46,8 +48,6 @@ def initialize_llm():
     global llm
     if llm is not None:
         return llm
-
-    os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
 
     try:
         dtype_env = os.getenv("DTYPE", "auto")
