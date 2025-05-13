@@ -1,36 +1,55 @@
-import numpy as np
+import torch
 from vector_db.utils import embed_texts
 from vector_db.chroma_client import collection
+from typing import List, Dict
+import logging
 
-if __name__ != "__main__":
-    import os
-    from vector_db.init_data import init_vector_store_from_csv
+def cosine_similarity(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    a = a / torch.norm(a, dim=-1, keepdim=True)
+    b = b / torch.norm(b, dim=-1, keepdim=True)
+    return torch.matmul(a, b.T)  
 
-    current_dir = os.path.dirname(__file__)
-    csv_path = os.path.join(current_dir, "question_data.csv")
-    init_vector_store_from_csv(csv_path)
+def rag_retriever(
+    main_question: str,
+    keyword: str,
+    top_k: int = 6,
+    sim_threshold: float = 0.6
+) -> List[Dict[str, float]]:
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-def cosine_similarity(a, b):
-    a = np.array(a)
-    b = np.array(b)
-    return np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b))
+    try:
+        keyword_emb = embed_texts([keyword])[0] 
+        keyword_tensor = torch.tensor(keyword_emb, dtype=torch.float32, device=device).unsqueeze(0)
 
-def rag_retriever(main_question: str, keyword: str, top_k: int = 6, sim_threshold: float = 0.6):
-    keyword_embedding = embed_texts([keyword])[0]
-    results = collection.query(
-        query_embeddings=[keyword_embedding],
-        n_results=top_k * 2,
-        include=["documents", "embeddings"]
-    )
+        results = collection.query(
+            query_embeddings=[keyword_emb],  
+            n_results=top_k * 5, 
+            include=["documents", "embeddings"]
+        )
 
-    all_questions = results["documents"][0]
-    all_embeddings = results["embeddings"][0]
+        docs = results.get("documents", [[]])[0]
+        embs = results.get("embeddings", [[]])[0]
 
-    filtered = []
-    for q, q_emb in zip(all_questions, all_embeddings):
-        sim = cosine_similarity(keyword_embedding, q_emb)
-        if sim >= sim_threshold:
-            filtered.append({"question": q, "similarity": round(sim, 4)})
+        if len(docs) == 0 or len(embs) == 0:
+            return []
 
-    filtered.sort(key=lambda x: -x["similarity"])
-    return filtered[:top_k]
+        embedding_tensor = torch.tensor(embs, dtype=torch.float32, device=device)
+
+        similarities = cosine_similarity(keyword_tensor, embedding_tensor).squeeze(0)
+
+        top_sim_values, top_indices = similarities.topk(k=top_k * 2)
+
+        filtered = [
+            {
+                "question": docs[i],
+                "similarity": round(sim, 4)
+            }
+            for i, sim in zip(top_indices.tolist(), top_sim_values.tolist())
+            if sim >= sim_threshold
+        ]
+
+        return filtered[:top_k]
+
+    except Exception as e:
+        logging.warning(f"RAG 검색 실패: {e}")
+        return []
