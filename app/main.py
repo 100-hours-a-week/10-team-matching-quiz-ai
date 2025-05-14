@@ -28,10 +28,18 @@ async def lifespan(app: FastAPI):
 
     yield
 
-    logger.info("애플리케이션 종료 - 리소스 정리 (필요시)...")
-    # 필요한 경우 LLM 엔진 종료 로직 추가
-    # 예: if global_llm_engine and hasattr(global_llm_engine, 'shutdown'):
-    #         await global_llm_engine.shutdown() # vLLM 엔진에 shutdown 메소드가 있다면
+    logger.info("애플리케이션 종료 - 리소스 정리 시작...")
+    if global_llm_engine and hasattr(global_llm_engine, 'shutdown_background_loop'):
+        try:
+            logger.info("AsyncLLMEngine 백그라운드 루프 종료 시도...")
+            global_llm_engine.shutdown_background_loop()
+            logger.info("AsyncLLMEngine 백그라운드 루프가 성공적으로 종료되었습니다.")
+        except Exception as e:
+            logger.error(f"AsyncLLMEngine 백그라운드 루프 종료 중 오류 발생: {e}")
+    else:
+        logger.info(
+            "AsyncLLMEngine가 초기화되지 않았거나 shutdown_background_loop 메소드가 없어 종료를 건너뜁니다.")
+    logger.info("애플리케이션 종료 - 리소스 정리 완료.")
 
 app = FastAPI(lifespan=lifespan)
 app.include_router(router)
