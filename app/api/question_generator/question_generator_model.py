@@ -70,6 +70,7 @@ def initialize_llm():
         quantization_env = os.getenv("VLLM_QUANTIZATION", None)
         # Use MODEL_PATH as default for tokenizer
         tokenizer_path_env = os.getenv("VLLM_TOKENIZER_PATH", MODEL_PATH)
+        prefill_chunk_size = int(os.getenv('VLLM_PREFILL_CHUNK_SIZE','256'))
 
         engine_args = AsyncEngineArgs(
             model=MODEL_PATH,
@@ -84,6 +85,9 @@ def initialize_llm():
             max_num_batched_tokens=max_num_batched_tokens_env,
             max_num_seqs=max_num_seqs_env,
             enforce_eager=enforce_eager_env,
+            enable_prefill_parallelism=True,
+            enable_chunked_prefill=True,
+            prefill_chunk_size=,
         )
 
         llm = AsyncLLMEngine.from_engine_args(engine_args)
