@@ -1,54 +1,47 @@
-import torch
-from vector_db.utils import embed_texts
-from vector_db.chroma_client import collection
 from typing import List, Dict
+import torch
 import logging
+import numpy as np
+from vector_db.utils import embed_texts
+from vector_db.chroma_client import get_all_documents_with_vectors
+from sentence_transformers.util import cos_sim
 
-def cosine_similarity(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
-    a = a / torch.norm(a, dim=-1, keepdim=True)
-    b = b / torch.norm(b, dim=-1, keepdim=True)
-    return torch.matmul(a, b.T)  
+
+def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    a = a / np.linalg.norm(a)
+    b = b / np.linalg.norm(b)
+    return float(np.dot(a, b))
 
 def rag_retriever(
     main_question: str,
-    keyword: str,
-    top_k: int = 6,
-    sim_threshold: float = 0.6
+    keyword: str = None,
+    top_k: int = 4,
+    sim_threshold: float = 0.7,
+    question_weight: float = 0.12,
+    keyword_weight: float = 0.88
 ) -> List[Dict[str, float]]:
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
     try:
-        keyword_emb = embed_texts([keyword])[0] 
-        keyword_tensor = torch.tensor(keyword_emb, dtype=torch.float32, device=device).unsqueeze(0)
+        if not keyword:
+            question_weight, keyword_weight = 1.0, 0.0
 
-        results = collection.query(
-            query_embeddings=[keyword_emb],  
-            n_results=top_k * 5, 
-            include=["documents", "embeddings"]
-        )
+        q_vec = embed_texts([main_question])[0]
+        k_vec = embed_texts([keyword])[0] if keyword else None
 
-        docs = results.get("documents", [[]])[0]
-        embs = results.get("embeddings", [[]])[0]
+        all_docs = get_all_documents_with_vectors()
+        results = []
 
-        if len(docs) == 0 or len(embs) == 0:
-            return []
+        for _, doc_text, doc_vec in all_docs:
+            q_sim = cosine_similarity(np.array(q_vec), np.array(doc_vec))
+            k_sim = cosine_similarity(np.array(k_vec), np.array(doc_vec)) if k_vec else 0.0
+            final_sim = question_weight * q_sim + keyword_weight * k_sim
+            if final_sim >= sim_threshold:
+                results.append({
+                    "question": doc_text,
+                    "similarity": round(final_sim, 4)
+                })
 
-        embedding_tensor = torch.tensor(embs, dtype=torch.float32, device=device)
-
-        similarities = cosine_similarity(keyword_tensor, embedding_tensor).squeeze(0)
-
-        top_sim_values, top_indices = similarities.topk(k=top_k * 2)
-
-        filtered = [
-            {
-                "question": docs[i],
-                "similarity": round(sim, 4)
-            }
-            for i, sim in zip(top_indices.tolist(), top_sim_values.tolist())
-            if sim >= sim_threshold
-        ]
-
-        return filtered[:top_k]
+        sorted_results = sorted(results, key=lambda x: x["similarity"], reverse=True)
+        return sorted_results[:top_k]
 
     except Exception as e:
         logging.warning(f"RAG 검색 실패: {e}")

@@ -2,6 +2,7 @@ from sentence_transformers import SentenceTransformer
 import logging
 import warnings
 from vector_db.config import EMBEDDING_MODEL_NAME
+import numpy as np
 
 # transformers 관련 경고 숨기기
 logging.getLogger("transformers.modeling_utils").setLevel(logging.ERROR)
