@@ -87,7 +87,7 @@ def initialize_llm():
             enforce_eager=enforce_eager_env,
             enable_prefill_parallelism=True,
             enable_chunked_prefill=True,
-            prefill_chunk_size=,
+            prefill_chunk_size=prefill_chunk_size,
         )
 
         llm = AsyncLLMEngine.from_engine_args(engine_args)
