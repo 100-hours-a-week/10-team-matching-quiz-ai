@@ -12,7 +12,6 @@ def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     b = b / np.linalg.norm(b)
     return float(np.dot(a, b))
 
-
 def rag_retriever(
     main_question: str,
     keyword: str = None,
@@ -23,7 +22,7 @@ def rag_retriever(
 ) -> List[Dict[str, float]]:
     try:
         if not keyword:
-            question_weight, keyword_weight = 1.0, 0.0  # ✅ 추가된 부분
+            question_weight, keyword_weight = 1.0, 0.0
 
         q_vec = embed_texts([main_question])[0]
         k_vec = embed_texts([keyword])[0] if keyword else None
