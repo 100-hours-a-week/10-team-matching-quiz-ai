@@ -17,3 +17,7 @@ def save_to_vectorstore(questions, embeddings, batch_size=5000):
             embeddings=embeddings[i:i+batch_size],
             ids=ids[i:i+batch_size]
         )
+
+def get_all_documents_with_vectors():
+    results = collection.get(include=["embeddings", "documents"])
+    return list(zip(results["ids"], results["documents"], results["embeddings"]))
