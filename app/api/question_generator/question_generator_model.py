@@ -85,7 +85,6 @@ def initialize_llm():
             max_num_batched_tokens=max_num_batched_tokens_env,
             max_num_seqs=max_num_seqs_env,
             enforce_eager=enforce_eager_env,
-            enable_prefill_parallelism=True,
             enable_chunked_prefill=True,
             prefill_chunk_size=prefill_chunk_size,
         )
