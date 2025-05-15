@@ -84,8 +84,6 @@ def initialize_llm():
             max_num_batched_tokens=max_num_batched_tokens_env,
             max_num_seqs=max_num_seqs_env,
             enforce_eager=enforce_eager_env,
-            worker_use_ray=False,  # Explicitly set if not using Ray
-            engine_use_ray=False,  # Explicitly set if not using Ray
         )
 
         llm = AsyncLLMEngine.from_engine_args(engine_args)
