@@ -7,7 +7,6 @@ from app.api.question_generator.question_generator_model import (
 )
 import logging
 
-# 로거 설정
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
