@@ -17,11 +17,14 @@ def rag_retriever(
     main_question: str,
     keyword: str = None,
     top_k: int = 4,
-    sim_threshold: float = 0.6,
-    question_weight: float = 0.15,
-    keyword_weight: float = 0.85
+    sim_threshold: float = 0.7,
+    question_weight: float = 0.12,
+    keyword_weight: float = 0.88
 ) -> List[Dict[str, float]]:
     try:
+        if not keyword:
+            question_weight, keyword_weight = 1.0, 0.0  # ✅ 추가된 부분
+
         q_vec = embed_texts([main_question])[0]
         k_vec = embed_texts([keyword])[0] if keyword else None
 
@@ -38,7 +41,6 @@ def rag_retriever(
                     "similarity": round(final_sim, 4)
                 })
 
-        # 유사도 기준 정렬 후 top_k 반환
         sorted_results = sorted(results, key=lambda x: x["similarity"], reverse=True)
         return sorted_results[:top_k]
 
