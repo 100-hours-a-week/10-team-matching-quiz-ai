@@ -14,3 +14,6 @@ def init_vector_store_from_csv(csv_path: str):
     save_to_vectorstore(questions, embeddings)
 
     print(f"총 {len(questions)}개의 질문이 저장되었습니다.")
+
+if __name__ == "__main__":
+    init_vector_store_from_csv("./vector_db/question_data.csv")
