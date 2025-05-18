@@ -3,10 +3,10 @@ import torch
 import logging
 import numpy as np
 import re
-from vector_db.utils import embed_texts, get_keyword_model, clean_keyword_phrase
+from vector_db.utils import embed_texts, clean_keyword_phrase, get_keyword_model
 from vector_db.chroma_client import get_all_documents_with_vectors
+from vector_db.config import RAG_TOP_K, SIM_THRESHOLD, RAG_DIVERSITY
 
-# ✅ 키워드 추출 함수 (후처리 포함)
 def extract_keywords_fallback(text: str, fallback_n: int = 3) -> List[str]:
     try:
         if len(text.strip().split()) <= 2:
@@ -24,7 +24,7 @@ def extract_keywords_fallback(text: str, fallback_n: int = 3) -> List[str]:
             stop_words=None,
             top_n=dynamic_top_n,
             use_mmr=True,
-            diversity=0.2
+            diversity=RAG_DIVERSITY
         )
 
         phrases = [clean_keyword_phrase(k[0]) for k in keywords if k[1] >= 0.5]
@@ -32,13 +32,11 @@ def extract_keywords_fallback(text: str, fallback_n: int = 3) -> List[str]:
 
         return phrases if phrases else [clean_keyword_phrase(text)]
         
-    
     except Exception as e:
         logging.warning(f"❌ 키워드 추출 실패: {e}")
         return [clean_keyword_phrase(text)]
 
 
-# ✅ 안전한 cosine 유사도 계산 함수 (NaN 방지)
 def safe_cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     if np.linalg.norm(a) == 0 or np.linalg.norm(b) == 0:
         return 0.0
@@ -46,17 +44,17 @@ def safe_cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     b = b / np.linalg.norm(b)
     return float(np.dot(a, b))
 
-# ✅ RAG 검색기 (개선된 버전)
+
 def rag_retriever(
     main_question: str,
     keyword: Optional[str] = None,
-    top_k: int = 4,
-    sim_threshold: float = 0.6,  # soft rerank 위해 기준 완화
+    top_k: int = RAG_TOP_K,
+    sim_threshold: float = SIM_THRESHOLD,
     base_question_weight: float = 0.3,
     base_keyword_weight: float = 0.6
 ) -> List[Dict[str, float]]:
+    
     try:
-        # ✅ 메인 질문 키워드 및 임베딩
         question_keywords = extract_keywords_fallback(main_question)
         question_keyword = ", ".join(question_keywords)
         
@@ -94,7 +92,6 @@ def rag_retriever(
 
             final_sim = question_weight * q_sim + keyword_weight * k_sim
 
-            # 🔁 키워드 가산점: 한 개당 0.05, 최대 0.15 제한
             if auto_keyword:
                 keyword_list = set([kw.strip().lower() for kw in auto_keyword.split(",")])
                 keyword_bonus = sum(
@@ -112,12 +109,9 @@ def rag_retriever(
                     "auto_keyword": auto_keyword
                 })
 
-        
-        # ✅ soft rerank
         sorted_results = sorted(results, key=lambda x: x["similarity"], reverse=True)
         return sorted_results[:top_k * 2][:top_k]
 
     except Exception as e:
         logging.warning(f"❌ RAG 검색 실패: {e}")
         return []
-
