@@ -9,6 +9,9 @@ import logging
 import uuid
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 
 # vector_db 모듈이 존재하는지 확인
 try:
