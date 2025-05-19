@@ -28,7 +28,7 @@ def extract_keywords_fallback(text: str, fallback_n: int = 3) -> List[str]:
         )
 
         phrases = [clean_keyword_phrase(k[0]) for k in keywords if k[1] >= 0.5]
-        phrases = [clean_keyword_phrase(p) for p in phrases]  # ✅ 추가 보정
+        phrases = [clean_keyword_phrase(p) for p in phrases]  
 
         return phrases if phrases else [clean_keyword_phrase(text)]
         
