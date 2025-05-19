@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 
 # vector_db 모듈이 존재하는지 확인
 try:
-    from vector_db.retriever import rag_retriever
+    from app.vector_db.retriever import rag_retriever
     VECTOR_DB_AVAILABLE = True
     logging.info("Vector DB 모듈이 로드되었습니다.")
 except ImportError:

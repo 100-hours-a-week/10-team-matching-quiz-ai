@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 VECTOR_DB_AVAILABLE = False
 try:
-    from vector_db.utils import get_embedding_model, get_keyword_model
+    from app.vector_db.utils import get_embedding_model, get_keyword_model
 
     VECTOR_DB_AVAILABLE = True
     logger.info(
