@@ -6,7 +6,7 @@ package-mode = false
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = ">=3.11,<3.12"
+python = ">=3.10,<3.13"
 
 # ── Core AI / NLP ─────────────────────────────
 torch = "2.6.0"
@@ -47,23 +47,6 @@ mysql-connector-python = "^8.4.0"
 # ── Test / Export ─────────────────────────────
 pytest = "^8.2.0"
 poetry-plugin-export = "^1.9.0"
-
-# ── 수동 추가 패키지 ───────────────
-email_validator = "2.2.0"
-jaraco-classes = "3.4.0"
-jaraco-context = "6.0.1"
-jaraco-functools = "4.1.0"
-jpype1 = "1.5.2"
-keybert = "0.9.0"
-konlpy = "0.6.0"
-lxml = "5.4.0"
-mistral_common = "1.5.4"
-outlines_core = "0.1.26"
-prometheus_client = "0.21.1"
-pyasn1_modules = "0.4.2"
-pydantic_core = "2.33.2"
-pyproject_hooks = "1.2.0"
-typing_extensions = "4.13.2"
 
 # ── (Optional) ───────────
 httpx = "^0.28.1"
