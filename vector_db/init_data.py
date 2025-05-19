@@ -1,3 +1,7 @@
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import pandas as pd
 from utils import embed_texts
 from chroma_client import save_to_vectorstore, collection
@@ -5,8 +9,6 @@ import pysqlite3
 import sys
 
 def init_vector_store_from_csv(csv_path: str):
-    __import__('pysqlite3')
-    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
     if collection.count() > 0:
         print("이미 데이터가 존재합니다. 초기화를 건너뜁니다.")
         return
