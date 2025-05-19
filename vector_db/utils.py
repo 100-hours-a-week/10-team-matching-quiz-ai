@@ -1,7 +1,7 @@
 from sentence_transformers import SentenceTransformer
 import logging
 import warnings
-from vector_db.config import EMBEDDING_MODEL_NAME, KEYBERT_MODEL_NAME
+from config import EMBEDDING_MODEL_NAME, KEYBERT_MODEL_NAME
 import numpy as np
 from keybert import KeyBERT
 import re

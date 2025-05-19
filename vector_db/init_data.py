@@ -1,6 +1,6 @@
 import pandas as pd
-from vector_db.utils import embed_texts
-from vector_db.chroma_client import save_to_vectorstore, collection
+from utils import embed_texts
+from chroma_client import save_to_vectorstore, collection
 
 def init_vector_store_from_csv(csv_path: str):
     if collection.count() > 0:
