@@ -70,8 +70,9 @@ def rag_retriever(
             auto_keyword = ", ".join(keyword_phrases)
 
             if len(keyword_phrases) == 1 and len(keyword_phrases[0].split()) <= 1:
-                k_vec = None
-                question_weight, keyword_weight = 1.0, 0.0
+                keyword_weight = 0.4  
+                k_vec = embed_texts(keyword_phrases)[0]
+                question_weight = 1.0 - keyword_weight
 
             else:
                 k_vec = np.mean(embed_texts(keyword_phrases), axis=0)
