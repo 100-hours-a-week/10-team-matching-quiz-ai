@@ -5,7 +5,8 @@ import pysqlite3
 import sys
 
 def init_vector_store_from_csv(csv_path: str):
-    sys.modules["sqlite3"] = pysqlite3
+    __import__('pysqlite3')
+    sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
     if collection.count() > 0:
         print("이미 데이터가 존재합니다. 초기화를 건너뜁니다.")
         return
@@ -19,4 +20,4 @@ def init_vector_store_from_csv(csv_path: str):
     print(f"총 {len(questions)}개의 질문이 저장되었습니다.")
 
 if __name__ == "__main__":
-    init_vector_store_from_csv("vector_db/init_data.py")
+    init_vector_store_from_csv("vector_db/question_data.csv")
