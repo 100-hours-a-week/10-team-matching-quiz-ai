@@ -1,7 +1,4 @@
-__import__('pysqlite3')
-import sys
-sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
-
+import sqlite3
 from typing import List, Dict, Optional
 import torch
 import logging
@@ -57,7 +54,7 @@ def rag_retriever(
     base_question_weight: float = 0.3,
     base_keyword_weight: float = 0.6
 ) -> List[Dict[str, float]]:
-    sys.modules["sqlite3"] = pysqlite3
+
     try:
         question_keywords = extract_keywords_fallback(main_question)
         question_keyword = ", ".join(question_keywords)
@@ -73,13 +70,13 @@ def rag_retriever(
             keyword_phrases = extract_keywords_fallback(keyword)
             auto_keyword = ", ".join(keyword_phrases)
 
-            if len(keyword_phrases) == 1 and len(keyword_phrases[0].split()) <= 1:
+            if keyword_phrases:
+                k_vec = np.mean(embed_texts(keyword_phrases), axis=0)
+                question_weight, keyword_weight = 0.6, 0.4
+            else:
                 k_vec = None
                 question_weight, keyword_weight = 1.0, 0.0
 
-            else:
-                k_vec = np.mean(embed_texts(keyword_phrases), axis=0)
-                question_weight, keyword_weight = 0.6, 0.4
         else:
             auto_keyword = ""
             k_vec = None
@@ -114,7 +111,12 @@ def rag_retriever(
                 })
 
         sorted_results = sorted(results, key=lambda x: x["similarity"], reverse=True)
-        return sorted_results[:top_k * 2][:top_k]
+        return {
+            "results": sorted_results[:top_k],
+            "question_keyword": question_keyword,
+            "auto_keyword": auto_keyword
+        }
+
 
     except Exception as e:
         logging.warning(f"❌ RAG 검색 실패: {e}")

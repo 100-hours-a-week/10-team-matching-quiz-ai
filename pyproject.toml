@@ -28,6 +28,7 @@ bitsandbytes = "0.45.3"
 chromadb = "1.0.7"
 sentence-transformers = "^2.7.0"
 scipy = "^1.13.0"
+keybert = "^0.9.0"
 
 # ── STT (Whisper) ─────────────────────────────
 whisper = "^1.1.10" # openai-whisper 기반
@@ -54,7 +55,6 @@ jaraco-classes = "3.4.0"
 jaraco-context = "6.0.1"
 jaraco-functools = "4.1.0"
 jpype1 = "1.5.2"
-keybert = "0.9.0"
 konlpy = "0.6.0"
 lxml = "5.4.0"
 mistral_common = "1.5.4"
