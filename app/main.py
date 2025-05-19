@@ -14,15 +14,15 @@ logger = logging.getLogger(__name__)
 
 VECTOR_DB_AVAILABLE = False
 try:
-    from vector_db.utils import get_model
+    from vector_db.utils import get_embedding_model, get_keyword_model
 
     VECTOR_DB_AVAILABLE = True
     logger.info(
-        "Vector DB 모듈(vector_db.utils.get_model)이 성공적으로 로드되었습니다."
+        "Vector DB 모듈(vector_db.utils.get_embedding/keyword_model)이 성공적으로 로드되었습니다."
     )
 except ImportError:
     logger.warning(
-        "Vector DB 모듈(vector_db.utils.get_model)을 찾을 수 없습니다. "
+        "Vector DB 모듈(vector_db.utils.get_embedding/keyword_model)을 찾을 수 없습니다. "
         "Vector DB 관련 기능이 비활성화될 수 있습니다."
     )
 
@@ -49,9 +49,10 @@ async def lifespan(app: FastAPI):
     if VECTOR_DB_AVAILABLE:
         logger.info("Vector DB 관련 모델(get_model) 초기화를 시도합니다...")
         try:
-            get_model()  # 동기 함수로 가정, 비동기라면 await get_model()
+            get_embedding_model()  # 동기 함수로 가정, 비동기라면 await get_embedding_model()
+            get_keyword_model()
             logger.info(
-                "Vector DB 관련 모델(get_model) 초기화가 성공적으로 완료되었습니다."
+                "Vector DB 관련 모델(get_embedding/keyword_model) 초기화가 성공적으로 완료되었습니다."
             )
         except Exception as e:
             logger.error(
