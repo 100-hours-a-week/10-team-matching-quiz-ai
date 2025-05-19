@@ -6,8 +6,11 @@ from app.api.question_generator.question_generator_model import (
     llm as global_llm_engine,
 )
 import logging
-
+import os
 import sys
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
 logger_sys = logging.getLogger("sys_path_check")
 logger_sys.info(f"Current sys.path: {sys.path}")
 
