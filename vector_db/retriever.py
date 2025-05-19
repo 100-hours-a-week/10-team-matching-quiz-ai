@@ -6,6 +6,8 @@ import re
 from utils import embed_texts, clean_keyword_phrase, get_keyword_model
 from chroma_client import get_all_documents_with_vectors
 from config import RAG_TOP_K, SIM_THRESHOLD, RAG_DIVERSITY
+import pysqlite3
+import sys
 
 def extract_keywords_fallback(text: str, fallback_n: int = 3) -> List[str]:
     try:
@@ -53,7 +55,7 @@ def rag_retriever(
     base_question_weight: float = 0.3,
     base_keyword_weight: float = 0.6
 ) -> List[Dict[str, float]]:
-    
+    sys.modules["sqlite3"] = pysqlite3
     try:
         question_keywords = extract_keywords_fallback(main_question)
         question_keyword = ", ".join(question_keywords)
