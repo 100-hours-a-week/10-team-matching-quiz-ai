@@ -1,4 +1,7 @@
-import sqlite3
+import pysqlite3
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import pandas as pd
 from vector_db.utils import embed_texts
 from vector_db.chroma_client import save_to_vectorstore, collection
