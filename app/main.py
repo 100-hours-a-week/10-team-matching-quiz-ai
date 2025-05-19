@@ -6,6 +6,17 @@ from app.api.question_generator.question_generator_model import (
     llm as global_llm_engine,
 )
 import logging
+import os
+import sys
+
+# 현재 파일(main.py)의 디렉터리 (app/)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+# 프로젝트 루트 디렉터리 (app/의 부모 디렉터리)
+project_root = os.path.dirname(current_dir)
+
+# 프로젝트 루트를 sys.path에 추가
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
