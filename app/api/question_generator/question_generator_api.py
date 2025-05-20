@@ -1,6 +1,12 @@
 from fastapi import APIRouter, HTTPException, status
-from app.api.question_generator.question_generator_schema import FollowupRequest, FollowupResponse
-from app.api.question_generator.question_generator_model import call_llm, call_openai_api
+from app.api.question_generator.question_generator_schema import (
+    FollowupRequest,
+    FollowupResponse,
+)
+from app.api.question_generator.question_generator_model import (
+    call_llm,
+    call_openai_api,
+)
 from app.api.question_generator.question_generator_parser import parse_questions
 import asyncio
 from langfuse import Langfuse
