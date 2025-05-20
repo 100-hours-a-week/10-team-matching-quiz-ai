@@ -52,8 +52,8 @@ def safe_cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 def rag_retriever(
     main_question: str,
     keyword: Optional[str] = None,
-    top_k: int = RAG_TOP_K,
-    sim_threshold: float = SIM_THRESHOLD,
+    top_k: int = 4,
+    sim_threshold: float = 0.6,
     base_question_weight: float = 0.3,
     base_keyword_weight: float = 0.6
 ) -> List[Dict[str, float]]:
