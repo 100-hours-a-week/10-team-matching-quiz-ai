@@ -1,3 +1,7 @@
+import pysqlite3
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import chromadb
 import hashlib
 from app.vector_db.config import DB_PATH, COLLECTION_NAME
