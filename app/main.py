@@ -6,6 +6,9 @@ from app.api.question_generator.question_generator_model import (
     llm as global_llm_engine,
 )
 import logging
+import sys
+
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
