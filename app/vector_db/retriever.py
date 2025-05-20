@@ -55,7 +55,7 @@ def rag_retriever(
     top_k: int = 4,
     sim_threshold: float = 0.6,
     base_question_weight: float = 0.3,
-    base_keyword_weight: float = 0.6
+    base_keyword_weight: float = 0.7
 ) -> List[Dict[str, float]]:
 
     try:
