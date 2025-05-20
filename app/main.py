@@ -7,7 +7,7 @@ from app.api.question_generator.question_generator_model import (
 )
 import logging
 import sys
-
+import os
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../")))
 
 logging.basicConfig(
