@@ -7,9 +7,9 @@ import torch
 import logging
 import numpy as np
 import re
-from vector_db.utils import embed_texts, clean_keyword_phrase, get_keyword_model
-from vector_db.chroma_client import get_all_documents_with_vectors
-from vector_db.config import RAG_TOP_K, SIM_THRESHOLD, RAG_DIVERSITY
+from app.vector_db.utils import embed_texts, clean_keyword_phrase, get_keyword_model
+from app.vector_db.chroma_client import get_all_documents_with_vectors
+from app.vector_db.config import RAG_TOP_K, SIM_THRESHOLD, RAG_DIVERSITY
 
 def extract_keywords_fallback(text: str, fallback_n: int = 3) -> List[str]:
     try:
