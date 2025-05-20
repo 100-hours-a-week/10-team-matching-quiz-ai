@@ -3,8 +3,8 @@ import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 import pandas as pd
-from vector_db.utils import embed_texts
-from vector_db.chroma_client import save_to_vectorstore, collection
+from app.vector_db.utils import embed_texts
+from app.vector_db.chroma_client import save_to_vectorstore, collection
 
 def init_vector_store_from_csv(csv_path: str):
     if collection.count() > 0:
