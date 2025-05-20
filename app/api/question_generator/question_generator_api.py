@@ -80,7 +80,7 @@ def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
                 input={"query": req.selected_question, "keyword": req.keyword or ""},
                 output={"results": rag_results},
             )
-            retrieved_questions = [r["question"] for r in rag_results]
+            retrieved_questions = [r["question"] for r in rag_results['results']]
             if retrieved_questions:
                 joined_rag = "\n".join(f"- {q}" for q in retrieved_questions)
                 retrieved_section = f"\n\n[유사한 기존 질문]\n{joined_rag}"
