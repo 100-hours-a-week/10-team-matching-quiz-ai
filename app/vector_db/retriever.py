@@ -132,6 +132,8 @@ if __name__ == "__main__":
 
     result = rag_retriever(main_question=test_question, keyword=test_keyword)
 
+    print(result)
+
     print("🔍 [RAG 검색 결과 요약]")
     print(f"질문 키워드: {result.get('question_keyword', '')}")
     print(f"추출 키워드: {result.get('auto_keyword', '')}")
