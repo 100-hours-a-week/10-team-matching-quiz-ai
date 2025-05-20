@@ -74,7 +74,7 @@ def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
     if VECTOR_DB_AVAILABLE and rag_retriever:
         try:
             rag_results = rag_retriever(
-                req.selected_question, req.keyword or "", top_k=4
+                req.selected_question, req.keyword or ""
             )
             rag_span.update(
                 input={"query": req.selected_question, "keyword": req.keyword or ""},
