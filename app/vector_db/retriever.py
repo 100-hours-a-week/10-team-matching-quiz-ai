@@ -124,3 +124,18 @@ def rag_retriever(
     except Exception as e:
         logging.warning(f"❌ RAG 검색 실패: {e}")
         return []
+
+if __name__ == "__main__":
+    # 테스트용 입력
+    test_question = "컨볼루션 신경망의 장점은 무엇인가요?"
+    test_keyword = "이미지 처리"
+
+    result = rag_retriever(main_question=test_question, keyword=test_keyword)
+
+    print("🔍 [RAG 검색 결과 요약]")
+    print(f"질문 키워드: {result.get('question_keyword', '')}")
+    print(f"추출 키워드: {result.get('auto_keyword', '')}")
+    print("\n[Top 결과들]")
+    for i, item in enumerate(result.get("results", []), 1):
+        print(f"{i}. 유사도: {item['similarity']} / 질문: {item['question']}")
+    
