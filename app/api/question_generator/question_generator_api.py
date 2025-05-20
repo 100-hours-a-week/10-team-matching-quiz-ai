@@ -15,7 +15,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../.
 
 # vector_db 모듈이 존재하는지 확인
 try:
-    from app.vector_db.retriever import rag_retriever
+    from vector_db.retriever import rag_retriever
+
     VECTOR_DB_AVAILABLE = True
     logging.info("Vector DB 모듈이 로드되었습니다.")
 except ImportError:
@@ -32,14 +33,14 @@ logger = logging.getLogger(__name__)
 
 # Langfuse 클라이언트 초기화
 langfuse = Langfuse(
-    secret_key=os.getenv('LANGFUSE_SECRET_KEY'),
-    public_key=os.getenv('LANGFUSE_PUBLIC_KEY'),
-    host=os.getenv('LANGFUSE_HOST')
+    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
+    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
+    host=os.getenv("LANGFUSE_HOST"),
 )
 
 # 상수 정의
 GENERATE_COUNT = 4  # 생성할 질문의 수
-MAX_HISTORY_QUESTIONS = int(os.getenv('MAX_HISTORY_QUESTIONS', 20))
+MAX_HISTORY_QUESTIONS = int(os.getenv("MAX_HISTORY_QUESTIONS", 20))
 
 
 def validate_request(req: FollowupRequest) -> None:
@@ -47,12 +48,12 @@ def validate_request(req: FollowupRequest) -> None:
     if not req.selected_question or not req.selected_question.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="메인 질문은 비워둘 수 없습니다."
+            detail="메인 질문은 비워둘 수 없습니다.",
         )
     if not req.interview_id or not req.interview_id.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="유효한 interview_id가 필요합니다."
+            detail="유효한 interview_id가 필요합니다.",
         )
 
 
@@ -74,11 +75,12 @@ def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
     if VECTOR_DB_AVAILABLE and rag_retriever:
         try:
             rag_results = rag_retriever(
-                req.selected_question, req.keyword or "", top_k=4)
+                req.selected_question, req.keyword or "", top_k=4
+            )
             rag_span.update(
-                input={"query": req.selected_question,
-                       "keyword": req.keyword or ""},
-                output={"results": rag_results})
+                input={"query": req.selected_question, "keyword": req.keyword or ""},
+                output={"results": rag_results},
+            )
             retrieved_questions = [r["question"] for r in rag_results]
             if retrieved_questions:
                 joined_rag = "\n".join(f"- {q}" for q in retrieved_questions)
@@ -90,8 +92,9 @@ def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
             retrieved_section = ""  # fallback
     else:
         logging.info("Vector DB 모듈이 없어 RAG 검색을 건너뜁니다.")
-        rag_span.update(input={"status": "skipped"}, output={
-                        "reason": "Vector DB 모듈이 없음"})
+        rag_span.update(
+            input={"status": "skipped"}, output={"reason": "Vector DB 모듈이 없음"}
+        )
         rag_span.end()
 
     return {
@@ -109,15 +112,13 @@ async def generate_primary_questions(prompt: str, trace) -> List[str]:
 
     try:
         raw_response = await call_llm(prompt, trace_id=trace.id)
-        llm_span.update(input={"prompt": prompt}, output={
-                        "raw_response": raw_response})
+        llm_span.update(input={"prompt": prompt}, output={"raw_response": raw_response})
         llm_span.end()
 
         parsing_span = trace.span(name="response_parsing")
         questions = parse_questions(raw_response)[:GENERATE_COUNT]
         parsing_span.update(
-            input={"raw_response": raw_response},
-            output={"parsed_questions": questions}
+            input={"raw_response": raw_response}, output={"parsed_questions": questions}
         )
         parsing_span.end()
 
@@ -133,18 +134,17 @@ async def generate_additional_questions(
     passed_section: str,
     remaining_count: int,
     trace,
-    existing_questions: List[str]
+    existing_questions: List[str],
 ) -> List[str]:
-    """질문 개수가 부족할 시 추가질문을 생성 """
+    """질문 개수가 부족할 시 추가질문을 생성"""
     context_api = {
         "selected_question": req.selected_question,
         "keyword": req.keyword or "",
         "passed_questions": passed_section,
-        "ungenerated_questions_num": remaining_count
+        "ungenerated_questions_num": remaining_count,
     }
 
-    prompt_template_api = langfuse.get_prompt(
-        "followup_questions_generator_api")
+    prompt_template_api = langfuse.get_prompt("followup_questions_generator_api")
     prompt_api = prompt_template_api.compile(**context_api)
 
     llm_span_api = trace.span(name="open-api-call")
@@ -153,7 +153,7 @@ async def generate_additional_questions(
         raw_response_api = await call_openai_api(prompt_api, trace_id=trace.id)
         llm_span_api.update(
             input={"prompt_api": prompt_api},
-            output={"raw_response_api": raw_response_api}
+            output={"raw_response_api": raw_response_api},
         )
         llm_span_api.end()
 
@@ -161,13 +161,14 @@ async def generate_additional_questions(
         additional_questions = parse_questions(raw_response_api)
         parsing_span_api.update(
             input={"raw_response_api": raw_response_api},
-            output={"parsed_questions": additional_questions}
+            output={"parsed_questions": additional_questions},
         )
         parsing_span_api.end()
 
         # 중복 제거 및 최대 개수까지만 포함
         unique_questions = [
-            q for q in additional_questions if q not in existing_questions]
+            q for q in additional_questions if q not in existing_questions
+        ]
         result = existing_questions.copy()
         result.extend(unique_questions)
 
@@ -180,8 +181,7 @@ async def generate_additional_questions(
 
 @router.post("/followup-questions", response_model=FollowupResponse)
 async def generate_followup(req: FollowupRequest) -> FollowupResponse:
-    logger.info(
-        f"요청 받음: interview_id={req.interview_id}, req_data={req.dict()}")
+    logger.info(f"요청 받음: interview_id={req.interview_id}, req_data={req.dict()}")
 
     # 입력값 검증
     validate_request(req)
@@ -198,14 +198,15 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
             "selected_question": req.selected_question,
             "keyword": req.keyword,
             "passed_questions": req.passed_questions or [],
-        }
+        },
     )
 
     context = prepare_context(req, trace)
 
     # 메인 프롬프트 컴파일
     prompt_template = langfuse.get_prompt(
-        "followup_questions_generator")  # prompt는 langfuse에서 따로 관리
+        "followup_questions_generator"
+    )  # prompt는 langfuse에서 따로 관리
     prompt = prompt_template.compile(**context)
 
     try:
@@ -220,19 +221,20 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
                 context["passed_questions"],
                 remaining_count,
                 trace,
-                generated_questions
+                generated_questions,
             )
 
         # 결과 기록
         trace.update(output={"followup_questions": generated_questions})
         # trace.end()
         logger.info(
-            f"응답 반환: interview_id={req.interview_id}, questions_count={len(generated_questions)}")
+            f"응답 반환: interview_id={req.interview_id}, questions_count={len(generated_questions)}"
+        )
 
         return FollowupResponse(
             message="followup_questions_generated",
             interview_id=req.interview_id,
-            followup_questions=generated_questions
+            followup_questions=generated_questions,
         )
 
     except Exception as e:
@@ -241,5 +243,5 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
         logger.error(f"꼬리 질문 생성 실패: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"꼬리 질문 생성 실패: {str(e)}"
+            detail=f"꼬리 질문 생성 실패: {str(e)}",
         )

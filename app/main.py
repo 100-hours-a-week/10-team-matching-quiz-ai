@@ -6,13 +6,6 @@ from app.api.question_generator.question_generator_model import (
     llm as global_llm_engine,
 )
 import logging
-import os
-import sys
-
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-
-logger_sys = logging.getLogger("sys_path_check")
-logger_sys.info(f"Current sys.path: {sys.path}")
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -21,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 VECTOR_DB_AVAILABLE = False
 try:
-    from app.vector_db.utils import get_embedding_model, get_keyword_model
+    from vector_db.utils import get_embedding_model, get_keyword_model
 
     VECTOR_DB_AVAILABLE = True
     logger.info(
