@@ -291,10 +291,18 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
 
         input_tokens = response.usage.prompt_tokens
         output_tokens = response.usage.completion_tokens
+        input_cache_tokens = getattr(response.usage, "input_cached_tokens", 0)
+        input_cache_read_tokens = getattr(response.usage, "input_cache_read", 0)
+
         cost_per_1m_input = 0.15
         cost_per_1m_output = 0.60
-        cost = (input_tokens / 1_000_000 * cost_per_1m_input) + (
-            output_tokens / 1_000_000 * cost_per_1m_output
+        cost_per_1m_cache = 0.075
+
+        cost = (
+            (input_tokens / 1_000_000) * cost_per_1m_input
+            + (output_tokens / 1_000_000) * cost_per_1m_output
+            + (input_cache_read_tokens / 1_000_000) * cost_per_1m_cache
+            + (input_cache_tokens / 1_000_000) * cost_per_1m_cache
         )
 
         logger.info(
