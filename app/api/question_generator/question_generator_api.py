@@ -15,10 +15,12 @@ import logging
 import uuid
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
+import sys
 
+# sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../")))
 # vector_db 모듈이 존재하는지 확인
 try:
-    from vector_db.retriever import rag_retriever
+    from app.vector_db.retriever import rag_retriever
 
     VECTOR_DB_AVAILABLE = True
     logging.info("Vector DB 모듈이 로드되었습니다.")
@@ -78,13 +80,13 @@ def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
     if VECTOR_DB_AVAILABLE and rag_retriever:
         try:
             rag_results = rag_retriever(
-                req.selected_question, req.keyword or "", top_k=4
+                req.selected_question, req.keyword or ""
             )
             rag_span.update(
                 input={"query": req.selected_question, "keyword": req.keyword or ""},
                 output={"results": rag_results},
             )
-            retrieved_questions = [r["question"] for r in rag_results]
+            retrieved_questions = [r["question"] for r in rag_results['results']]
             if retrieved_questions:
                 joined_rag = "\n".join(f"- {q}" for q in retrieved_questions)
                 retrieved_section = f"\n\n[유사한 기존 질문]\n{joined_rag}"

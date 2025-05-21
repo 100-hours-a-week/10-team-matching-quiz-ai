@@ -1,11 +1,15 @@
+import pysqlite3
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 from typing import List, Dict, Optional
 import torch
 import logging
 import numpy as np
 import re
-from vector_db.utils import embed_texts, clean_keyword_phrase, get_keyword_model
-from vector_db.chroma_client import get_all_documents_with_vectors
-from vector_db.config import RAG_TOP_K, SIM_THRESHOLD, RAG_DIVERSITY
+from app.vector_db.utils import embed_texts, clean_keyword_phrase, get_keyword_model
+from app.vector_db.chroma_client import get_all_documents_with_vectors
+from app.vector_db.config import RAG_TOP_K, SIM_THRESHOLD, RAG_DIVERSITY
 
 def extract_keywords_fallback(text: str, fallback_n: int = 3) -> List[str]:
     try:
@@ -48,12 +52,12 @@ def safe_cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
 def rag_retriever(
     main_question: str,
     keyword: Optional[str] = None,
-    top_k: int = RAG_TOP_K,
-    sim_threshold: float = SIM_THRESHOLD,
+    top_k: int = 4,
+    sim_threshold: float = 0.6,
     base_question_weight: float = 0.3,
-    base_keyword_weight: float = 0.6
+    base_keyword_weight: float = 0.7
 ) -> List[Dict[str, float]]:
-    
+
     try:
         question_keywords = extract_keywords_fallback(main_question)
         question_keyword = ", ".join(question_keywords)
@@ -69,13 +73,13 @@ def rag_retriever(
             keyword_phrases = extract_keywords_fallback(keyword)
             auto_keyword = ", ".join(keyword_phrases)
 
-            if len(keyword_phrases) == 1 and len(keyword_phrases[0].split()) <= 1:
+            if keyword_phrases:
+                k_vec = np.mean(embed_texts(keyword_phrases), axis=0)
+                question_weight, keyword_weight = 0.6, 0.4
+            else:
                 k_vec = None
                 question_weight, keyword_weight = 1.0, 0.0
 
-            else:
-                k_vec = np.mean(embed_texts(keyword_phrases), axis=0)
-                question_weight, keyword_weight = 0.6, 0.4
         else:
             auto_keyword = ""
             k_vec = None
@@ -110,8 +114,30 @@ def rag_retriever(
                 })
 
         sorted_results = sorted(results, key=lambda x: x["similarity"], reverse=True)
-        return sorted_results[:top_k * 2][:top_k]
+        return {
+            "results": sorted_results[:top_k],
+            "question_keyword": question_keyword,
+            "auto_keyword": auto_keyword
+        }
+
 
     except Exception as e:
         logging.warning(f"❌ RAG 검색 실패: {e}")
         return []
+
+if __name__ == "__main__":
+    # 테스트용 입력
+    test_question = "컨볼루션 신경망의 장점은 무엇인가요?"
+    test_keyword = "이미지 처리"
+
+    result = rag_retriever(main_question=test_question, keyword=test_keyword)
+
+    print(result)
+
+    print("🔍 [RAG 검색 결과 요약]")
+    print(f"질문 키워드: {result.get('question_keyword', '')}")
+    print(f"추출 키워드: {result.get('auto_keyword', '')}")
+    print("\n[Top 결과들]")
+    for i, item in enumerate(result.get("results", []), 1):
+        print(f"{i}. 유사도: {item['similarity']} / 질문: {item['question']}")
+    

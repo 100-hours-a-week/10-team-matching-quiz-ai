@@ -1,6 +1,10 @@
+import pysqlite3
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import chromadb
 import hashlib
-from vector_db.config import DB_PATH, COLLECTION_NAME
+from app.vector_db.config import DB_PATH, COLLECTION_NAME
 
 chroma_client = chromadb.PersistentClient(path=DB_PATH)
 collection = chroma_client.get_or_create_collection(COLLECTION_NAME)
