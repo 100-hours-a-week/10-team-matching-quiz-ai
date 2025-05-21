@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 VECTOR_DB_AVAILABLE = False
 try:
     from app.vector_db.utils import get_embedding_model, get_keyword_model
-
     VECTOR_DB_AVAILABLE = True
     logger.info(
         "Vector DB 모듈(vector_db.utils.get_embedding/keyword_model)이 성공적으로 로드되었습니다."
@@ -25,7 +24,6 @@ except ImportError:
         "Vector DB 모듈(vector_db.utils.get_embedding/keyword_model)을 찾을 수 없습니다. "
         "Vector DB 관련 기능이 비활성화될 수 있습니다."
     )
-
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):

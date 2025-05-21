@@ -5,7 +5,6 @@ from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
-
 def _norm(text: str) -> str:
     text = unicodedata.normalize("NFC", text)
     text = re.sub(r"\s+", " ", text).strip()

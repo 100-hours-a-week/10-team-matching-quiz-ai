@@ -13,7 +13,6 @@ from huggingface_hub import login
 from openai import OpenAI
 from dotenv import load_dotenv
 
-# .env 파일 로드
 load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
@@ -68,7 +67,6 @@ def initialize_llm():
         max_num_seqs_env = int(os.getenv("VLLM_MAX_NUM_SEQS", "256"))
         enforce_eager_env = str2bool(os.getenv("VLLM_ENFORCE_EAGER", "False"))
         quantization_env = os.getenv("VLLM_QUANTIZATION", None)
-        # Use MODEL_PATH as default for tokenizer
         tokenizer_path_env = os.getenv("VLLM_TOKENIZER_PATH", MODEL_PATH)
 
         engine_args = AsyncEngineArgs(
@@ -119,7 +117,7 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
         Exception: LLM 호출 과정에서 발생한 예외 (fallback이 false이거나 fallback도 실패한 경우)
     """
     global llm
-    if llm is None:  # Should be initialized by main application startup
+    if llm is None: 
         logger.error("LLM (AsyncLLMEngine) is not initialized.")
         if try_fallback and OPENAI_API_KEY:
             logger.info("LLM not initialized, falling back to OpenAI API.")
@@ -176,13 +174,11 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
             logger.error(
                 f"AsyncLLMEngine generation error for request {request_id}: {e}"
             )
-            # Attempt to abort the request if it's still running and an error occurs during iteration
-            if llm:  # Check if llm is still available
-                # Non-blocking abort
+            if llm:  
                 asyncio.create_task(llm.abort(request_id))
             raise
 
-    generation = None  # For langfuse
+    generation = None 
     try:
         generation_kwargs = {
             "name": "local-llm-call-async-engine",
@@ -271,7 +267,6 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
 
         generation = langfuse.generation(**generation_kwargs)
 
-        # Wrap the synchronous OpenAI API call in asyncio.to_thread
         def _blocking_openai_call():
             return openai_client.chat.completions.create(
                 model=model_name,
@@ -291,8 +286,6 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
 
         input_tokens = response.usage.prompt_tokens
         output_tokens = response.usage.completion_tokens
-        # Cost for gpt-4o-mini (as of May 2024, check current pricing)
-        # Input: $0.15 / 1M tokens, Output: $0.60 / 1M tokens
         cost_per_1m_input = 0.15
         cost_per_1m_output = 0.60
         cost = (input_tokens / 1_000_000 * cost_per_1m_input) + (
@@ -305,13 +298,12 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
 
         generation.end(
             output=response.choices[0].message.content,
-            usage={  # Langfuse expects 'usage' not 'usage_details'
-                "promptTokens": input_tokens,  # Corrected field names
+            usage={  
+                "promptTokens": input_tokens, 
                 "completionTokens": output_tokens,
                 "totalTokens": input_tokens + output_tokens,
             },
-            metadata={  # Langfuse expects 'metadata' for cost, not 'cost_details'
-                # Storing cost in metadata is a common practice
+            metadata={  
                 "cost_usd": cost,
                 "model_name": model_name,
             },
@@ -321,6 +313,6 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
     except Exception as e:
         error_message = f"OpenAI API ({model_name}) 호출 오류: {str(e)}"
         logger.error(error_message)
-        if generation:  # Ensure generation object exists
+        if generation:
             generation.end(error=error_message)
         raise

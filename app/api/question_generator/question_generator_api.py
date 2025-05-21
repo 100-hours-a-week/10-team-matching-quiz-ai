@@ -16,10 +16,10 @@ import uuid
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 
-# vector_db 모듈이 존재하는지 확인
+load_dotenv()
+
 try:
     from app.vector_db.retriever import rag_retriever
-
     VECTOR_DB_AVAILABLE = True
     logging.info("Vector DB 모듈이 로드되었습니다.")
 except ImportError:
@@ -27,22 +27,16 @@ except ImportError:
     rag_retriever = None
     logging.warning("Vector DB 모듈을 찾을 수 없습니다. RAG 기능이 비활성화됩니다.")
 
-
-# .env 파일 로드
-load_dotenv()
-
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# Langfuse 클라이언트 초기화
 langfuse = Langfuse(
     secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
     public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
     host=os.getenv("LANGFUSE_HOST"),
 )
 
-# 상수 정의
-GENERATE_COUNT = 4  # 생성할 질문의 수
+GENERATE_COUNT = 4 
 MAX_HISTORY_QUESTIONS = int(os.getenv("MAX_HISTORY_QUESTIONS", 20))
 
 
@@ -62,29 +56,26 @@ def validate_request(req: FollowupRequest) -> None:
 
 def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
     """요청 데이터로부터 프롬프트 컨텍스트 준비"""
-    # 사용된 질문 목록 최대 20개로 제한
     all_used_questions = (req.passed_questions or [])[-MAX_HISTORY_QUESTIONS:]
 
-    # 이전 질문 목록 형식화
     passed_section = ""
     if all_used_questions:
         joined = "\n".join(f"- {q}" for q in all_used_questions)
         passed_section = f"\n\n[이전 질문 목록]\n{joined}"
 
     retrieved_section = ""
-    # RAG 스팬 생성 -> RAG을 추적하기 위해
     rag_span = trace.span(name="rag_retrieval")
 
     if VECTOR_DB_AVAILABLE and rag_retriever:
         try:
             rag_results = rag_retriever(
-                req.selected_question, req.keyword or "", top_k=4
+                req.selected_question, req.keyword or ""
             )
             rag_span.update(
                 input={"query": req.selected_question, "keyword": req.keyword or ""},
                 output={"results": rag_results},
             )
-            retrieved_questions = [r["question"] for r in rag_results]
+            retrieved_questions = [r["question"] for r in rag_results['results']]
             if retrieved_questions:
                 joined_rag = "\n".join(f"- {q}" for q in retrieved_questions)
                 retrieved_section = f"\n\n[유사한 기존 질문]\n{joined_rag}"
@@ -186,11 +177,8 @@ async def generate_additional_questions(
 async def generate_followup(req: FollowupRequest) -> FollowupResponse:
     logger.info(f"요청 받음: interview_id={req.interview_id}, req_data={req.dict()}")
 
-    # 입력값 검증
     validate_request(req)
 
-    # 트레이스 ID 생성 및 컨텍스트 준비
-    # 고유의 질문을 추적하기 위해 uuid 사용
     trace_id = f"followup_{req.interview_id}_{uuid.uuid4().hex}"
 
     trace = langfuse.trace(
@@ -206,17 +194,13 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
 
     context = prepare_context(req, trace)
 
-    # 메인 프롬프트 컴파일
     prompt_template = langfuse.get_prompt(
         "followup_questions_generator"
     )  # prompt는 langfuse에서 따로 관리
     prompt = prompt_template.compile(**context)
 
     try:
-        # 주 질문 생성
         generated_questions = await generate_primary_questions(prompt, trace)
-
-        # 필요한 경우 추가 질문 생성
         if len(generated_questions) < GENERATE_COUNT:
             remaining_count = GENERATE_COUNT - len(generated_questions)
             generated_questions = await generate_additional_questions(
@@ -227,9 +211,7 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
                 generated_questions,
             )
 
-        # 결과 기록
         trace.update(output={"followup_questions": generated_questions})
-        # trace.end()
         logger.info(
             f"응답 반환: interview_id={req.interview_id}, questions_count={len(generated_questions)}"
         )
@@ -242,7 +224,6 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
 
     except Exception as e:
         trace.update(error={"message": str(e)})
-        # trace.end()
         logger.error(f"꼬리 질문 생성 실패: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
