@@ -24,9 +24,9 @@ HF_TOKEN = os.getenv("HF_TOKEN")
 if HF_TOKEN:
     try:
         login(token=HF_TOKEN)
-        logger.info("Successfully logged in to Hugging Face Hub")
+        logger.info("Hugging Face Hub에 성공적으로 로그인했습니다.")
     except Exception as e:
-        logger.warning(f"Failed to login to Hugging Face Hub: {e}")
+        logger.warning(f"Hugging Face Hub 로그인 실패: {e}")
 
 MODEL_PATH = os.getenv("LLM_MODEL_PATH")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
@@ -89,7 +89,7 @@ def initialize_llm():
         llm = AsyncLLMEngine.from_engine_args(engine_args)
 
         logger.info(
-            f"AsyncLLMEngine 모델 로드 성공: {MODEL_PATH} with params: "
+            f"AsyncLLMEngine 모델 로드 성공: {MODEL_PATH}, 다음 파라미터로 초기화: "
             f"tokenizer_path='{tokenizer_path_env}', dtype={dtype_env}, tensor_parallel_size={tensor_parallel_size_env}, "
             f"trust_remote_code={trust_remote_code_env}, download_dir='{download_dir_env}', "
             f"max_model_len={max_model_len_env}, gpu_memory_utilization={gpu_memory_utilization_env}, "
@@ -119,12 +119,12 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
     """
     global llm
     if llm is None:
-        logger.error("LLM is not initialized.")
+        logger.error("LLM이 초기화되지 않았습니다.")
         if try_fallback and OPENAI_API_KEY:
-            logger.info("LLM not initialized, falling back to OpenAI API.")
+            logger.info("LLM이 초기화되지 않아 OpenAI API로 대체합니다.")
             return await call_openai_api(prompt, trace_id)
         raise RuntimeError(
-            "LLM (AsyncLLMEngine) is not initialized and fallback is disabled."
+            "LLM (AsyncLLMEngine)이 초기화되지 않았고 fallback이 비활성화되어 있습니다."
         )
 
     request_id = uuid.uuid4().hex
@@ -169,14 +169,12 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
                         final_output_text = request_output.outputs[0].text
                     else:
                         logger.warning(
-                            f"Request {request_id} finished but no text output found or output is None."
+                            f"요청 {request_id}이 완료되었지만 텍스트 출력을 찾을 수 없거나 출력이 None입니다."
                         )
                     break
             return final_output_text
         except Exception as e:
-            logger.error(
-                f"AsyncLLMEngine generation error for request {request_id}: {e}"
-            )
+            logger.error(f"요청 {request_id}에 대한 AsyncLLMEngine 생성 오류: {e}")
             if llm:
                 asyncio.create_task(llm.abort(request_id))
             raise
@@ -230,20 +228,22 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
 
         asyncio.create_task(llm.abort(request_id))
 
-        if generation:  # Ensure generation object exists
+        if generation:  # generation 객체가 존재하는지 확인
             generation.end(
                 error=error_message, metadata=generation_kwargs.get("metadata", {})
             )
 
         if try_fallback and OPENAI_API_KEY:
-            logger.info(f"로컬 LLM ({MODEL_PATH}) 실패/타임아웃, OpenAI API로 fallback")
+            logger.info(
+                f"로컬 LLM ({MODEL_PATH}) 실패/타임아웃, OpenAI API로 fallback합니다."
+            )
             return await call_openai_api(prompt, trace_id)
 
         if isinstance(e, asyncio.TimeoutError):
-            # Re-raise as specific TimeoutError
+            # 특정 TimeoutError로 다시 발생
             raise TimeoutError(error_message)
         else:
-            raise Exception(error_message)  # Re-raise general exception
+            raise Exception(error_message)  # 일반 예외 다시 발생
 
 
 async def call_openai_api(prompt: str, trace_id: str = None) -> str:
@@ -252,7 +252,7 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
     주로 부족한 질문을 채우기 위한 백업 메커니즘으로 사용됩니다.
     """
     model_name = "gpt-4o-mini"
-    generation = None  # For langfuse
+    generation = None  # Langfuse용
 
     try:
         generation_kwargs = {
@@ -283,7 +283,7 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
                     {"role": "user", "content": prompt},
                 ],
                 temperature=0.7,
-                max_tokens=500,  # Consider making this configurable via env var
+                max_tokens=500,  # 환경 변수를 통해 구성 가능하도록 고려
                 top_p=0.95,
             )
 
