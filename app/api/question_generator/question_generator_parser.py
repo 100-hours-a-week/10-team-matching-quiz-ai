@@ -9,8 +9,7 @@ MAX_QUESTION_LENGTH = 100  # 허용되는 최대 질문 길이
 
 # "질문 1. ..." 또는 "Q1. ..." 형식의 질문 문장을 추출하는 정규식
 QUESTION_PATTERN = re.compile(
-    r"^(?:질문|문제|꼬리질문|꼬리\s*질문|Question|Q)\s*\d+\s*\.\s*(.+)", 
-    re.IGNORECASE
+    r"^(?:질문|문제|꼬리질문|꼬리\s*질문|Question|Q)\s*\d+\s*\.\s*(.+)", re.IGNORECASE
 )
 
 # 문장이 마침표, 느낌표, 물음표, … 등으로 끝나는지 확인하는 정규식
@@ -28,6 +27,7 @@ MD_STRIKETHROUGH_PATTERN = re.compile(r"~~([^~]+)~~")
 # 마크다운 서식 기호(굵게, 기울임, 코드, 헤더 등)를 감지하는 정규식
 MD_FORMATTING_PATTERN = re.compile(r"(\*\*|\*|_|`|#+)")
 
+
 def _norm(text: str) -> str:
     """텍스트를 정규화"""
     text = unicodedata.normalize("NFC", text)
@@ -36,12 +36,14 @@ def _norm(text: str) -> str:
         text += "."
     return text
 
+
 def _strip_md(s: str) -> str:
     """마크다운 서식을 제거"""
     s = MD_LINK_PATTERN.sub(r"\1", s)
     s = MD_STRIKETHROUGH_PATTERN.sub(r"\1", s)
     s = MD_FORMATTING_PATTERN.sub("", s)
     return s.strip()
+
 
 def parse_questions(text: str, strip_md: bool = True) -> List[str]:
     """정제된 텍스트에서 질문을 추출"""
@@ -51,7 +53,7 @@ def parse_questions(text: str, strip_md: bool = True) -> List[str]:
     for line in lines:
         line = line.strip()
         match = QUESTION_PATTERN.match(line)
-        
+
         if match:
             question_text = match.group(1).strip()
 
