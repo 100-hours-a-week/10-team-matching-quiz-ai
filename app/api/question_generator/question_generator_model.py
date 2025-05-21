@@ -38,7 +38,6 @@ langfuse = Langfuse(
     host=os.getenv("LANGFUSE_HOST"),
 )
 
-# 지연 초기화를 위한 전역 변수
 llm: Optional[AsyncLLMEngine] = None
 
 
@@ -68,6 +67,7 @@ def initialize_llm():
         enforce_eager_env = str2bool(os.getenv("VLLM_ENFORCE_EAGER", "False"))
         quantization_env = os.getenv("VLLM_QUANTIZATION", None)
         tokenizer_path_env = os.getenv("VLLM_TOKENIZER_PATH", MODEL_PATH)
+        kv_cache_dtype = os.getenv("VLLM_KV_CACHE_DTYPE", "auto")
 
         engine_args = AsyncEngineArgs(
             model=MODEL_PATH,
@@ -83,6 +83,7 @@ def initialize_llm():
             max_num_seqs=max_num_seqs_env,
             enforce_eager=enforce_eager_env,
             enable_chunked_prefill=True,
+            disable_log_requests=True,
         )
 
         llm = AsyncLLMEngine.from_engine_args(engine_args)
@@ -117,14 +118,17 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
         Exception: LLM 호출 과정에서 발생한 예외 (fallback이 false이거나 fallback도 실패한 경우)
     """
     global llm
-    if llm is None: 
-        logger.error("LLM (AsyncLLMEngine) is not initialized.")
+    if llm is None:
+        logger.error("LLM is not initialized.")
         if try_fallback and OPENAI_API_KEY:
             logger.info("LLM not initialized, falling back to OpenAI API.")
             return await call_openai_api(prompt, trace_id)
         raise RuntimeError(
             "LLM (AsyncLLMEngine) is not initialized and fallback is disabled."
         )
+
+    request_id = uuid.uuid4().hex
+    generation = None
 
     async def _generate_with_async_engine():
         temperature_env = float(os.getenv("VLLM_SAMPLING_TEMPERATURE", "0.7"))
@@ -152,7 +156,6 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
             stop=stop_sequences_env,
         )
 
-        request_id = uuid.uuid4().hex
         results_generator = llm.generate(prompt, params, request_id)
 
         final_output_text = ""
@@ -174,14 +177,14 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
             logger.error(
                 f"AsyncLLMEngine generation error for request {request_id}: {e}"
             )
-            if llm:  
+            if llm:
                 asyncio.create_task(llm.abort(request_id))
             raise
 
-    generation = None 
+    generation = None
     try:
         generation_kwargs = {
-            "name": "local-llm-call-async-engine",
+            "name": "local-llm",
             "model": MODEL_PATH,
             "input": prompt,
             "metadata": {
@@ -224,6 +227,8 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
         )
 
         logger.error(error_message)
+
+        asyncio.create_task(llm.abort(request_id))
 
         if generation:  # Ensure generation object exists
             generation.end(
@@ -298,12 +303,12 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
 
         generation.end(
             output=response.choices[0].message.content,
-            usage={  
-                "promptTokens": input_tokens, 
+            usage={
+                "promptTokens": input_tokens,
                 "completionTokens": output_tokens,
                 "totalTokens": input_tokens + output_tokens,
             },
-            metadata={  
+            metadata={
                 "cost_usd": cost,
                 "model_name": model_name,
             },
