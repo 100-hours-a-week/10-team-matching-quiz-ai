@@ -32,9 +32,9 @@ def get_keyword_model():
     if _kw_model is None:
         try:
             _kw_model = KeyBERT(model=KEYBERT_MODEL_NAME)
-            print("✅ KeyBERT 모델 로딩 완료")
+            print("KeyBERT 모델 로딩 완료")
         except Exception as e:
-            print("❌ KeyBERT 모델 로딩 실패:", e)
+            print("KeyBERT 모델 로딩 실패:", e)
             raise
     return _kw_model
 
