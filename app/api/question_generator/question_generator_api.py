@@ -130,6 +130,8 @@ async def generate_additional_questions(
     existing_questions: List[str],
 ) -> List[str]:
     """질문 개수가 부족할 시 추가질문을 생성"""
+    logger.info(f"OpenAI API로 추가 질문 생성 시작: interview_id={req.interview_id}, remaining_count={remaining_count}")
+    
     context_api = {
         "selected_question": req.selected_question,
         "keyword": req.keyword or "",
@@ -165,8 +167,11 @@ async def generate_additional_questions(
         result = existing_questions.copy()
         result.extend(unique_questions)
 
+        logger.info(f"OpenAI API로 추가 질문 생성 완료: interview_id={req.interview_id}, generated_count={len(additional_questions)}, unique_count={len(unique_questions)}")
+
         return result[:GENERATE_COUNT]
     except Exception as e:
+        logger.error(f"OpenAI API 추가 질문 생성 실패: interview_id={req.interview_id}, error={str(e)}")
         if not llm_span_api.ended:
             llm_span_api.end(error=str(e))
         raise
