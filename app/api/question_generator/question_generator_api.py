@@ -40,6 +40,18 @@ langfuse = Langfuse(
 GENERATE_COUNT = 4
 MAX_HISTORY_QUESTIONS = int(os.getenv("MAX_HISTORY_QUESTIONS", 20))
 
+_prompt_cache = {}
+
+def get_cached_prompt(prompt_name: str):
+    """프롬프트를 캐시에서 가져오거나, 없으면 Langfuse에서 로드하여 캐시에 저장"""
+    if prompt_name not in _prompt_cache:
+        logger.info(f"프롬프트 캐시 미스: {prompt_name} - Langfuse에서 로드 중...")
+        _prompt_cache[prompt_name] = langfuse.get_prompt(prompt_name)
+        logger.info(f"프롬프트 캐시 저장 완료: {prompt_name}")
+    else:
+        logger.debug(f"프롬프트 캐시 히트: {prompt_name}")
+    
+    return _prompt_cache[prompt_name]
 
 def validate_request(req: FollowupRequest) -> None:
     """입력 요청 유효성 검사"""
@@ -139,7 +151,7 @@ async def generate_additional_questions(
         "ungenerated_questions_num": remaining_count,
     }
 
-    prompt_template_api = langfuse.get_prompt("followup_questions_generator_api")
+    prompt_template_api = get_cached_prompt("followup_questions_generator_api")
     prompt_api = prompt_template_api.compile(**context_api)
 
     llm_span_api = trace.span(name="open-api-call")
@@ -198,9 +210,7 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
 
     context = prepare_context(req, trace)
 
-    prompt_template = langfuse.get_prompt(
-        "followup_questions_generator"
-    )  # prompt는 langfuse에서 따로 관리
+    prompt_template = get_cached_prompt("followup_questions_generator")
     prompt = prompt_template.compile(**context)
 
     try:
