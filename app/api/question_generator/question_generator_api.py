@@ -243,3 +243,85 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"꼬리 질문 생성 실패: {str(e)}",
         )
+
+
+@router.post("/open-api-server", response_model=FollowupResponse)
+async def generate_followup(req: FollowupRequest) -> FollowupResponse:
+    logger.info(f"요청 받음: interview_id={req.interview_id}, req_data={req.dict()}")
+
+    validate_request(req)
+
+    trace_id = f"followup_{req.interview_id}{uuid.uuid4().hex}"
+
+    trace = langfuse.trace(
+        id=trace_id,
+        name="followup_generation_api",  # 이름 변경으로 구분
+        input={
+            "interview_id": req.interview_id,
+            "selected_question": req.selected_question,
+            "keyword": req.keyword,
+            "passed_questions": req.passed_questions or [],
+        },
+    )
+
+    try:
+        logger.info(f"OpenAI API를 통한 질문 생성 시작: interview_id={req.interview_id}")
+        
+        context = prepare_context(req, trace)
+        
+        context_api = {
+            "selected_question": req.selected_question,
+            "keyword": req.keyword or "",
+            "passed_questions": context["passed_questions"],
+            "num_questions": GENERATE_COUNT,
+        }
+        
+        prompt_template_api = get_cached_prompt("followup_questions_generator_api")
+        prompt_api = prompt_template_api.compile(**context_api)
+
+        llm_span_api = trace.span(name="openai_api_call")
+
+        try:
+            raw_response_api = await call_openai_api(prompt_api, trace_id=trace.id)
+            llm_span_api.update(
+                input={"prompt_api": prompt_api},
+                output={"raw_response_api": raw_response_api},
+            )
+            llm_span_api.end()
+
+            parsing_span_api = trace.span(name="response_parsing_api")
+            generated_questions = parse_questions(raw_response_api)[:GENERATE_COUNT]
+            parsing_span_api.update(
+                input={"raw_response_api": raw_response_api},
+                output={"parsed_questions": generated_questions},
+            )
+            parsing_span_api.end()
+
+            logger.info(
+                f"OpenAI API 질문 생성 완료: interview_id={req.interview_id}, generated_count={len(generated_questions)}"
+            )
+
+        except Exception as e:
+            logger.error(f"OpenAI API 질문 생성 실패: interview_id={req.interview_id}, error={str(e)}")
+            if not llm_span_api.ended:
+                llm_span_api.end(error=str(e))
+            raise
+
+        trace.update(output={"followup_questions": generated_questions})
+        logger.info(
+            f"응답 반환: interview_id={req.interview_id}, questions_count={len(generated_questions)}"
+        )
+
+        return FollowupResponse(
+            message="followup_questions_generated",
+            interview_id=req.interview_id,
+            followup_questions=generated_questions,
+        )
+
+    except Exception as e:
+        trace.update(error={"message": str(e)})
+        logger.error(f"꼬리 질문 생성 실패: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"꼬리 질문 생성 실패: {str(e)}",
+        )
