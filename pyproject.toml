@@ -2,6 +2,66 @@
 name = "10-team-matching-quiz-ai"
 version = "0.1.0"
 description = "AI 기반 면접 질문 생성, 복습 퀴즈 생성, STT 피드백 서버"
+package-mode = false
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.11,<3.12"
+
+# ── Core AI / NLP ─────────────────────────────
+torch = "2.6.0"
+transformers = "4.51.3"
+accelerate = "^0.30.1"
+peft = "^0.10.0"
+datasets = "^2.19.0"
+
+# ── FastAPI + Inference Server ────────────────
+fastapi = "0.115.9"
+uvicorn = "^0.29.0"
+vllm = "0.8.5.post1"
+
+# ── RAG & Vector DB ───────────────────────────
+langchain = "0.3.24"
+chromadb = "1.0.7"
+sentence-transformers = "^2.7.0"
+scipy = "^1.13.0"
+
+# ── STT (Whisper) ─────────────────────────────
+whisper = "^1.1.10" # openai-whisper 기반
+
+# ── Monitoring ────────────────────────────────
+langfuse = "2.60.3"
+langsmith = "0.3.33"
+
+# ── Util / Infra ──────────────────────────────
+python-dotenv = "^1.1.0"
+pandas = "^2.2.2"
+tqdm = "^4.67.1"
+requests = "^2.31.0"
+loguru = "^0.7.2"
+boto3 = "^1.34.0"
+mysql-connector-python = "^8.4.0"
+
+# ── Test / Export ─────────────────────────────
+pytest = "^8.2.0"
+poetry-plugin-export = "^1.9.0"
+
+# ── (Optional) ───────────
+httpx = { version = "^0.28.1", optional = true }
+tiktoken = { version = "0.9.0", optional = true }
+pydantic = { version = "^2.11.3", optional = true }
+# bitsandbytes = { version = "0.45.5", optional = true }
+
+[tool.poetry.extras]
+optional = ["httpx", "tiktoken", "pydantic"]
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+[tool.poetry]
+name = "10-team-matching-quiz-ai"
+version = "0.1.0"
+description = "AI 기반 면접 질문 생성, 복습 퀴즈 생성, STT 피드백 서버"
 authors = ["tykong08 <taeyoung.kong@outlook.com>"]
 readme = "README.md"
 
