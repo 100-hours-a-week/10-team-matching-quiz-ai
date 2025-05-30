@@ -31,11 +31,10 @@ def generate_quiz_api(req: FollowupRequest):
 
     # Langfuse Prompt 불러오기
     prompt_template = langfuse.get_prompt("quiz_generation")
-    prompt = prompt_template + "\n" + "\n".join(req.question_history_list)
+    prompt = prompt_template.text + "\n" + "\n".join(req.question_history_list)
 
     if trace:
         trace.span(name="build_prompt", input=prompt)
-
 
     raw_output = generate_quiz(prompt)
 
