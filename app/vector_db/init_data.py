@@ -22,9 +22,12 @@ def init_question_vector_store_from_csv(csv_path: str):
 
     df = pd.read_csv(csv_path, quotechar='"', on_bad_lines='skip')
     questions = df["question"].dropna().tolist()
-
-    print(f"총 {len(questions)}개의 질문을 임베딩 중...")
-    embeddings = embed_texts(questions,enrich_type='question')
+    
+    # 중복 제거
+    questions = list(set(questions))
+    print(f"중복 제거 후 총 {len(questions)}개의 질문을 임베딩 중...")
+    
+    embeddings = embed_texts(questions, enrich_type='question')
     save_to_question_vectorstore(questions, embeddings)
 
     print(f"꼬리질문 벡터스토어에 총 {len(questions)}개의 질문이 저장되었습니다.")
@@ -39,29 +42,34 @@ def init_quiz_vector_store_from_json(json_path: str):
         rag_data = json.load(f)
 
     documents = []
+    seen_docs = set()  # 중복 체크용
 
     for i, item in enumerate(rag_data):
         doc_parts = []
         
-        if item.get('definition'):
+        if item.get('definition') and item.get('definition').strip():
             doc_parts.append(f"정의: {item.get('definition', '').strip()}")
-        if item.get('how_it_works'):
+        if item.get('how_it_works') and item.get('how_it_works').strip():
             doc_parts.append(f"동작 원리: {item.get('how_it_works', '').strip()}")
         
         comparison = item.get("comparison", None)
         if comparison and comparison.strip():
             doc_parts.append(f"비교: {comparison.strip()}")
 
-        full_doc = "\n\n".join(doc_parts)
-        
-        documents.append(full_doc)
+        if doc_parts:  # 빈 문서가 아닌 경우만
+            full_doc = "\n\n".join(doc_parts)
+            
+            # 중복 체크
+            if full_doc not in seen_docs:
+                documents.append(full_doc)
+                seen_docs.add(full_doc)
 
     print(f"총 {len(documents)}개의 퀴즈 문서를 임베딩 중...")
-    embeddings = embed_texts(documents,enrich_type='quiz')
+    embeddings = embed_texts(documents, enrich_type='quiz')
     save_to_quiz_vectorstore(documents, embeddings)
 
     print(f"퀴즈 벡터스토어에 총 {len(documents)}개의 문서가 저장되었습니다.")
-
+    
 def init_all_vector_stores():
     """모든 벡터스토어 초기화"""
     print("=== 벡터스토어 초기화 시작 ===")
@@ -70,7 +78,7 @@ def init_all_vector_stores():
     init_question_vector_store_from_csv("app/vector_db/question_data.csv")
     
     # 퀴즈용 벡터스토어 초기화
-    init_quiz_vector_store_from_json("rag_data.json")
+    init_quiz_vector_store_from_json("app/vector_db/rag_data.json")
     
     print("=== 벡터스토어 초기화 완료 ===")
 
