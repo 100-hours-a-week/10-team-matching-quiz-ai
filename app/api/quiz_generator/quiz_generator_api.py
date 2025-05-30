@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 from app.api.quiz_generator.quiz_generator_schema import FollowupRequest, FollowupResponse, QuizItem
-from app.api.quiz_generator.quiz_generator_parser import build_prompt, parse_response
+from app.api.quiz_generator.quiz_generator_parser import parse_response
 from app.api.quiz_generator.quiz_generator_model import generate_quiz
 from app.api.quiz_generator.quiz_generator_config import (
     QUIZ_LANGFUSE_SECRET_KEY,
@@ -18,9 +18,9 @@ langfuse = Langfuse(
     host=QUIZ_LANGFUSE_HOST,
 )
 
-@router.post("/quiz/generate_quiz", response_model=FollowupResponse)
+@router.post("/generate_quiz", response_model=FollowupResponse)
 def generate_quiz_api(req: FollowupRequest):
-    print(" 요청 수신: /quiz/generate_quiz")
+    print(" 요청 수신: /generate_quiz")
 
     trace = langfuse.trace(
         name="quiz_generation",
@@ -29,20 +29,23 @@ def generate_quiz_api(req: FollowupRequest):
         metadata={"endpoint": "/quiz/generate_quiz"}
     )
 
-    prompt = build_prompt(req.question_history_list)
+    # Langfuse Prompt 불러오기
+    prompt_template = langfuse.get_prompt("quiz_generation")
+    prompt = prompt_template.render(input_variables={
+        "joined": "\n".join(req.question_history_list)
+    })
+
     if trace:
         trace.span(name="build_prompt", input=prompt)
 
-    raw_output = generate_quiz(prompt)
 
-    print(raw_output)
+    raw_output = generate_quiz(prompt)
 
     if trace:
         trace.span(
             name="llm_response",
             input=prompt,
             output=raw_output,
-            metadata={"duration_sec": round(duration, 2)}
         )
 
     parsed_list = parse_response(raw_output)

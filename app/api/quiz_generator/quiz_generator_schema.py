@@ -8,7 +8,7 @@ class FollowupRequest(BaseModel):
 
 
 class QuizItem(BaseModel):
-    difficulty: Literal["하", "중", "상"]
+    difficulty: Literal["상", "중", "하"]
     question: str
     options: List[str]
     answer_index: int
