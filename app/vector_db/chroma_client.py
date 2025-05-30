@@ -35,15 +35,13 @@ def save_to_quiz_vectorstore(documents, embeddings, metadatas=None, batch_size=1
     ids = [generate_id(doc) for doc in documents]
 
     for i in range(0, len(documents), batch_size):
-        batch_metadatas = metadatas[i:i+batch_size] if metadatas else None
         quiz_collection.upsert(
             documents=documents[i:i+batch_size],
             embeddings=embeddings[i:i+batch_size],
-            ids=ids[i:i+batch_size],
-            metadatas=batch_metadatas
+            ids=ids[i:i+batch_size]
         )
         
 def get_all_quiz_documents_with_vectors():
     """퀴즈 생성용 벡터스토어에서 모든 문서 조회"""
-    results = quiz_collection.get(include=["embeddings", "documents", "metadatas"])
-    return list(zip(results["ids"], results["documents"], results["embeddings"], results.get("metadatas", [])))
+    results = quiz_collection.get(include=["embeddings", "documents"])
+    return list(zip(results["ids"], results["documents"], results["embeddings"]))
