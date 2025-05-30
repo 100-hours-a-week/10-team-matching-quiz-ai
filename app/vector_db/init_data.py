@@ -25,7 +25,7 @@ def init_question_vector_store_from_csv(csv_path: str):
     questions = df["question"].dropna().tolist()
 
     print(f"총 {len(questions)}개의 질문을 임베딩 중...")
-    embeddings = embed_texts(questions)
+    embeddings = embed_texts(questions,content_type = "question")
     save_to_question_vectorstore(questions, embeddings)
 
     print(f"꼬리질문 벡터스토어에 총 {len(questions)}개의 질문이 저장되었습니다.")
@@ -40,12 +40,10 @@ def init_quiz_vector_store_from_json(json_path: str):
         rag_data = json.load(f)
 
     documents = []
-    metadatas = []
 
     for i, item in enumerate(rag_data):
         doc_parts = []
         
-        # 각 필드를 문서에 추가
         if item.get('definition'):
             doc_parts.append(f"정의: {item.get('definition', '').strip()}")
         if item.get('how_it_works'):
@@ -58,11 +56,10 @@ def init_quiz_vector_store_from_json(json_path: str):
         full_doc = "\n\n".join(doc_parts)
         
         documents.append(full_doc)
-        metadatas.append({"question": item.get("question", "")})
 
     print(f"총 {len(documents)}개의 퀴즈 문서를 임베딩 중...")
     embeddings = embed_texts(documents)
-    save_to_quiz_vectorstore(documents, embeddings, metadatas)
+    save_to_quiz_vectorstore(documents, embeddings)
 
     print(f"퀴즈 벡터스토어에 총 {len(documents)}개의 문서가 저장되었습니다.")
 
