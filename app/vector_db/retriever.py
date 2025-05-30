@@ -131,20 +131,20 @@ def question_rag_retriever(
         return []
 
 def quiz_rag_retriever(
-    query: str,
+    question: str,
     top_k: int = 3,
     sim_threshold: float = 0.7
 ) -> Dict:
     """퀴즈 생성용 RAG 검색기"""
     try:
-        query_embeds = embed_texts([query],enrich_type='quiz')
-        query_vec = np.array(query_embeds[0])
+        question_embeds = embed_texts([question],enrich_type='quiz')
+        question_vec = np.array(question_embeds[0])
         
         all_docs = get_all_quiz_documents_with_vectors()
         results = []
 
         for doc_id, doc_text, doc_vec in all_docs:
-            similarity = safe_cosine_similarity(query_vec, np.array(doc_vec))
+            similarity = safe_cosine_similarity(question_vec, np.array(doc_vec))
             
             if similarity >= sim_threshold:
                 results.append({
@@ -156,11 +156,10 @@ def quiz_rag_retriever(
         sorted_results = sorted(results, key=lambda x: x["similarity"], reverse=True)
         
         return {
-            "results": sorted_results[:top_k],
-            "query": query,
-            "total_found": len(sorted_results)
+            "결과": sorted_results[:top_k],
+            "질문": question
         }
 
     except Exception as e:
         logging.warning(f"퀴즈 RAG 검색 실패: {e}")
-        return {"results": [], "query": query, "total_found": 0}
+        return {"results": [], "query": question, "total_found": 0}
