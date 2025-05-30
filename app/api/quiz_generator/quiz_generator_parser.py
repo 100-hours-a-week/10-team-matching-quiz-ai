@@ -19,20 +19,19 @@ def parse_response(response_text: str) -> list:
         re.DOTALL
     )
     for match in re.finditer(pattern, response_text):
-        print("⚠️ match.groups():", match.groups())
+        print("match.groups():", match.groups())
 
         if len(match.groups()) != 5:
-            print("❌ 예상한 5개 그룹이 아닙니다. 스킵합니다. →", match.groups())
+            print("예상한 5개 그룹이 아닙니다. 스킵합니다. →", match.groups())
             continue
 
         difficulty, question, options, answer_index, explanation = match.groups()
 
-        # 🔽 문자열 옵션 안전하게 파싱
+        # 문자열 옵션 안전하게 파싱
         options = parse_choices(options)
         if len(options) != 4:
-            print("❌ 보기 4개가 아님:", options)
+            print("보기 4개가 아님:", options)
             continue
-
 
         quiz_list.append({
             "difficulty": difficulty.strip(),
