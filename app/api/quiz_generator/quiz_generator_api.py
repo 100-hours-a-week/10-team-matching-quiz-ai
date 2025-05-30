@@ -29,34 +29,40 @@ def generate_quiz_api(req: FollowupRequest):
         metadata={"endpoint": "/quiz/generate_quiz"}
     )
 
-    # Langfuse Prompt 불러오기
     prompt_template = langfuse.get_prompt("quiz_generation")
-
     joined_questions = "\n".join(req.question_history_list)
 
-    # Langfuse 템플릿 객체가 compile 메서드를 지원하는지 확인
     if hasattr(prompt_template, "compile"):
         prompt = prompt_template.compile(joined=joined_questions)
     else:
-        # fallback: 직접 문자열 치환
         prompt = prompt_template.replace("{{joined}}", joined_questions)
 
-    # 프롬프트 빌드 트레이스 기록
+    print("\n=== [DEBUG] 최종 프롬프트 내용 ===\n")
+    print(prompt)
+    print("\n==============================\n")
+
     if trace:
         trace.span(name="build_prompt", input=prompt)
 
-    # 퀴즈 생성
+    # LLM 호출
+    print("모델 generate 시작")
     raw_output = generate_quiz(prompt)
+    print("모델 응답 생성 완료")
+
+    print("\n=== [DEBUG] LLM 응답 내용 ===\n")
+    print(raw_output)
+    print("\n==============================\n")
 
     if trace:
-        trace.span(
-            name="llm_response",
-            input=prompt,
-            output=raw_output,
-        )
+        trace.span(name="llm_response", input=prompt, output=raw_output)
 
-    # 퀴즈 파싱
+    # 파싱 시도
     parsed_list = parse_response(raw_output)
+
+    print("\n=== [DEBUG] 파싱된 리스트 ===")
+    print(parsed_list)
+    print("============================\n")
+
     quiz_items = [QuizItem(**item) for item in parsed_list]
 
     print(f"\n 전체 퀴즈 응답 반환 완료: 총 {len(quiz_items)}문항")
