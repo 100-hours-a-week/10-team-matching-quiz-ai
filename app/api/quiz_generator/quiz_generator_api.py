@@ -31,14 +31,21 @@ def generate_quiz_api(req: FollowupRequest):
 
     # Langfuse Prompt 불러오기
     prompt_template = langfuse.get_prompt("quiz_generation")
-    prompt = prompt_template.render(input_variables={
-        "joined": "\n".join(req.question_history_list)
-    })
 
+    joined_questions = "\n".join(req.question_history_list)
+
+    # Langfuse 템플릿 객체가 compile 메서드를 지원하는지 확인
+    if hasattr(prompt_template, "compile"):
+        prompt = prompt_template.compile(joined=joined_questions)
+    else:
+        # fallback: 직접 문자열 치환
+        prompt = prompt_template.replace("{{joined}}", joined_questions)
+
+    # 프롬프트 빌드 트레이스 기록
     if trace:
         trace.span(name="build_prompt", input=prompt)
 
-
+    # 퀴즈 생성
     raw_output = generate_quiz(prompt)
 
     if trace:
@@ -48,6 +55,7 @@ def generate_quiz_api(req: FollowupRequest):
             output=raw_output,
         )
 
+    # 퀴즈 파싱
     parsed_list = parse_response(raw_output)
     quiz_items = [QuizItem(**item) for item in parsed_list]
 
