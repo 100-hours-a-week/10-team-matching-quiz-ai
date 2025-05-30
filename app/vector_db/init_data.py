@@ -48,15 +48,15 @@ def init_quiz_vector_store_from_json(json_path: str):
         doc_parts = []
         
         if item.get('question') and item.get('question').strip():
-            doc_parts.append(f"유사질문 : {item.get('definition', '').strip()}")
+            doc_parts.append(f"참고 질문: {item.get('question', '').strip()}")
         if item.get('definition') and item.get('definition').strip():
-            doc_parts.append(f"유사질문의 정의: {item.get('definition', '').strip()}")
+            doc_parts.append(f"참고 질문에 필요한 정의: {item.get('definition', '').strip()}")
         if item.get('how_it_works') and item.get('how_it_works').strip():
-            doc_parts.append(f"유사질문의 동작 원리: {item.get('how_it_works', '').strip()}")
+            doc_parts.append(f"참고 질문의 동작 원리: {item.get('how_it_works', '').strip()}")
         
         comparison = item.get("comparison", None)
         if comparison and comparison.strip():
-            doc_parts.append(f"유사질문의 비교내용: {comparison.strip()}")
+            doc_parts.append(f"비교 내용: {comparison.strip()}")
 
         if doc_parts:  # 빈 문서가 아닌 경우만
             full_doc = "\n\n".join(doc_parts)
