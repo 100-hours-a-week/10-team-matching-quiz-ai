@@ -31,9 +31,9 @@ def generate_quiz_api(req: FollowupRequest):
 
     # Langfuse Prompt 불러오기
     prompt_template = langfuse.get_prompt("quiz_generation")
-    prompt_text = prompt_template.raw  # ← 여기서 실제 텍스트를 꺼냄
-
-    prompt = prompt_text + "\n" + "\n".join(req.question_history_list)
+    prompt = prompt_template.render(input_variables={
+        "joined": "\n".join(req.question_history_list)
+    })
 
     if trace:
         trace.span(name="build_prompt", input=prompt)
