@@ -31,7 +31,8 @@ def generate_quiz_api(req: FollowupRequest):
 
     # Langfuse Prompt 불러오기
     prompt_template = langfuse.get_prompt("quiz_generation")
-    prompt = prompt_template.text + "\n" + "\n".join(req.question_history_list)
+    prompt_text = prompt_template.get()  # 또는 .value, .text 등 가능성 확인
+    prompt = prompt_text + "\n" + "\n".join(req.question_history_list)
 
     if trace:
         trace.span(name="build_prompt", input=prompt)
