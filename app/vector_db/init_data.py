@@ -10,8 +10,7 @@ from app.vector_db.chroma_client import (
     save_to_question_vectorstore, 
     save_to_quiz_vectorstore,
     follow_up_collection,
-    quiz_collection,
-    get_collection_stats
+    quiz_collection
 )
 from app.vector_db.config import EMBEDDING_MODEL_NAME
 

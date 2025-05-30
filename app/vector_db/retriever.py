@@ -79,7 +79,7 @@ def question_rag_retriever(
             auto_keyword = ", ".join(keyword_phrases)
 
             if keyword_phrases:
-                k_vec = np.mean(embed_texts(keyword_phrases), axis=0)
+                k_vec = np.mean(embed_texts(keyword_phrases,enrich_type='question'), axis=0)
                 question_weight, keyword_weight = 0.6, 0.4
             else:
                 k_vec = None
