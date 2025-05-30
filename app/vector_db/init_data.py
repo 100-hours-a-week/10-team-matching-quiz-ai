@@ -25,7 +25,7 @@ def init_question_vector_store_from_csv(csv_path: str):
     questions = df["question"].dropna().tolist()
 
     print(f"총 {len(questions)}개의 질문을 임베딩 중...")
-    embeddings = embed_texts(questions,content_type = "question")
+    embeddings = embed_texts(questions,enrich_type='question')
     save_to_question_vectorstore(questions, embeddings)
 
     print(f"꼬리질문 벡터스토어에 총 {len(questions)}개의 질문이 저장되었습니다.")
@@ -58,7 +58,7 @@ def init_quiz_vector_store_from_json(json_path: str):
         documents.append(full_doc)
 
     print(f"총 {len(documents)}개의 퀴즈 문서를 임베딩 중...")
-    embeddings = embed_texts(documents)
+    embeddings = embed_texts(documents,enrich_type='quiz')
     save_to_quiz_vectorstore(documents, embeddings)
 
     print(f"퀴즈 벡터스토어에 총 {len(documents)}개의 문서가 저장되었습니다.")

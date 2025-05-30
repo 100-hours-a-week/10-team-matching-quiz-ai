@@ -8,10 +8,14 @@ import logging
 import numpy as np
 import re
 from app.vector_db.utils import embed_texts, clean_keyword_phrase, get_keyword_model
-from app.vector_db.chroma_client import get_all_documents_with_vectors
+from app.vector_db.chroma_client import (
+    get_all_question_documents_with_vectors,
+    get_all_quiz_documents_with_vectors
+)
 from app.vector_db.config import RAG_TOP_K, SIM_THRESHOLD, RAG_DIVERSITY
 
 def extract_keywords_fallback(text: str, fallback_n: int = 3) -> List[str]:
+    """텍스트에서 키워드를 추출하는 함수"""
     try:
         if len(text.strip().split()) <= 2:
             return [clean_keyword_phrase(text)]
@@ -42,6 +46,7 @@ def extract_keywords_fallback(text: str, fallback_n: int = 3) -> List[str]:
 
 
 def safe_cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """코사인 유사도 계산"""
     if np.linalg.norm(a) == 0 or np.linalg.norm(b) == 0:
         return 0.0
     a = a / np.linalg.norm(a)
@@ -49,7 +54,7 @@ def safe_cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
     return float(np.dot(a, b))
 
 
-def rag_retriever(
+def question_rag_retriever(
     main_question: str,
     keyword: Optional[str] = None,
     top_k: int = 4,
@@ -57,13 +62,13 @@ def rag_retriever(
     base_question_weight: float = 0.3,
     base_keyword_weight: float = 0.7
 ) -> List[Dict[str, float]]:
-
+    """꼬리질문 생성용 RAG 검색기 (키워드 기반 검색 포함)"""
     try:
         question_keywords = extract_keywords_fallback(main_question)
         question_keyword = ", ".join(question_keywords)
         
-        main_embeds = embed_texts([main_question])
-        kw_embeds = embed_texts(question_keywords)
+        main_embeds = embed_texts([main_question],enrich_type='question')
+        kw_embeds = embed_texts(question_keywords,enrich_type='question')
 
         q_vec_main = np.array(main_embeds[0])
         q_vec_kw = np.mean(np.array(kw_embeds), axis=0)
@@ -86,7 +91,7 @@ def rag_retriever(
             question_weight, keyword_weight = 1.0, 0.0
 
 
-        all_docs = get_all_documents_with_vectors()
+        all_docs = get_all_question_documents_with_vectors()
         results = []
 
         for _, doc_text, doc_vec in all_docs:
@@ -124,3 +129,38 @@ def rag_retriever(
     except Exception as e:
         logging.warning(f"RAG 검색 실패: {e}")
         return []
+
+def quiz_rag_retriever(
+    query: str,
+    top_k: int = 3,
+    sim_threshold: float = 0.7
+) -> Dict:
+    """퀴즈 생성용 RAG 검색기"""
+    try:
+        query_embeds = embed_texts([query],enrich_type='quiz')
+        query_vec = np.array(query_embeds[0])
+        
+        all_docs = get_all_quiz_documents_with_vectors()
+        results = []
+
+        for doc_id, doc_text, doc_vec in all_docs:
+            similarity = safe_cosine_similarity(query_vec, np.array(doc_vec))
+            
+            if similarity >= sim_threshold:
+                results.append({
+                    "document_id": doc_id,
+                    "content": doc_text,
+                    "similarity": round(similarity, 4)
+                })
+
+        sorted_results = sorted(results, key=lambda x: x["similarity"], reverse=True)
+        
+        return {
+            "results": sorted_results[:top_k],
+            "query": query,
+            "total_found": len(sorted_results)
+        }
+
+    except Exception as e:
+        logging.warning(f"퀴즈 RAG 검색 실패: {e}")
+        return {"results": [], "query": query, "total_found": 0}
