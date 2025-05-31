@@ -15,9 +15,10 @@ def parse_choices(raw_options: str) -> List[str]:
 def parse_response(response_text: str) -> list:
     quiz_list = []
     pattern = re.compile(
-        r"난이도: (.*?)\n문제: (.*?)\n선지: \[(.*?)\]\n정답 인덱스: (\d+)\n해설: (.*?)(?=\n난이도:|\Z)",
+        r"난이도:\s*(.*?)\s*문제:\s*(.*?)\s*선지:\s*\[(.*?)\]\s*정답 인덱스:\s*(\d+)\s*해설:\s*(.*?)(?=\s*난이도:|\Z)",
         re.DOTALL
     )
+
     for match in re.finditer(pattern, response_text):
         print("match.groups():", match.groups())
 
