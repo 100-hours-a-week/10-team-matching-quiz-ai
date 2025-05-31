@@ -12,34 +12,31 @@ def parse_choices(raw_options: str) -> List[str]:
     return options if len(options) == 4 else []
 
 
-def parse_response(response_text: str) -> list:
-    quiz_list = []
+import re
+
+def parse_response(response_text: str):
     pattern = re.compile(
-        r"난이도:\s*(.*?)\s*문제:\s*(.*?)\s*선지:\s*\[(.*?)\]\s*정답 인덱스:\s*(\d+)\s*해설:\s*(.*?)(?=\s*난이도:|\Z)",
+        r"난이도:\s*(.*?)\s*문제:\s*(.*?)\s*선지:\s*\[(.*?)\]\s*정답 인덱스:\s*(\d+)\s*해설:\s*(.*?)(?=\n난이도:|\Z)",
         re.DOTALL
     )
+    
+    quiz_list = []
+    matches = re.findall(pattern, response_text)
+    
+    for match in matches:
+        difficulty, question, options, answer_index, explanation = match
+        option_list = [opt.strip() for opt in options.split(",")]
 
-    for match in re.finditer(pattern, response_text):
-        print("match.groups():", match.groups())
-
-        if len(match.groups()) != 5:
-            print("예상한 5개 그룹이 아닙니다. 스킵합니다. →", match.groups())
-            continue
-
-        difficulty, question, options, answer_index, explanation = match.groups()
-
-        # 문자열 옵션 안전하게 파싱
-        options = parse_choices(options)
-        if len(options) != 4:
-            print("보기 4개가 아님:", options)
+        if len(option_list) != 4:
+            print("보기 항목 수가 4개가 아님:", option_list)
             continue
 
         quiz_list.append({
             "difficulty": difficulty.strip(),
             "question": question.strip(),
-            "options": options,
-            "answer_index": int(answer_index), 
-            "explanation": explanation.strip().strip("---").strip()
+            "options": option_list,
+            "answer_index": int(answer_index),
+            "explanation": explanation.strip()
         })
 
     return quiz_list
