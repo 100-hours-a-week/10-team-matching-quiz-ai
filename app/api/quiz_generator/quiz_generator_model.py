@@ -25,12 +25,12 @@ model = AutoModelForCausalLM.from_pretrained(
     trust_remote_code=True
 ).to(device)  
 
-# generate_quiz 함수 내에서도 입력을 같은 디바이스로 이동
+
 def generate_quiz(prompt: str, max_tokens: int = 2000) -> str:
     print("prompt 생성 및 디바이스 전송 중...")
     inputs = tokenizer(prompt, return_tensors="pt").to(device)  
 
-    print("모델 generate 시작")
+    print("quiz generate 시작")
     output = model.generate(
         **inputs,
         max_new_tokens=max_tokens,
@@ -40,5 +40,5 @@ def generate_quiz(prompt: str, max_tokens: int = 2000) -> str:
         top_p=0.9
     )
 
-    print("모델 응답 생성 완료")
+    print("quiz 생성 완료")
     return tokenizer.decode(output[0], skip_special_tokens=True)

@@ -38,22 +38,13 @@ def generate_quiz_api(req: FollowupRequest):
         prompt = prompt_template.replace("{{joined}}", joined_questions)
         prompt += "\n\n-출력은 위의 형식을 정확히 따르고, 반드시 10문제를 연속 출력하시오. 다른 설명은 절대 포함하지 마세요."
 
-
-    print("\n=== [DEBUG] 최종 프롬프트 내용 ===\n")
-    print(prompt)
-    print("\n==============================\n")
-
     if trace:
         trace.span(name="build_prompt", input=prompt)
 
     # LLM 호출
-    print("모델 generate 시작")
+    print("quiz generate 시작")
     raw_output = generate_quiz(prompt)
-    print("모델 응답 생성 완료")
-
-    print("\n=== [DEBUG] LLM 응답 내용 ===\n")
-    print(raw_output)
-    print("\n==============================\n")
+    print("quiz 생성 완료")
 
     if trace:
         trace.span(name="llm_response", input=prompt, output=raw_output)
@@ -61,17 +52,13 @@ def generate_quiz_api(req: FollowupRequest):
     # 파싱 시도
     parsed_list = parse_response(raw_output)
 
-    # 여기서 문제 수가 10개인지 확인
+    # 문제 수가 10개인지 확인
     if len(parsed_list) != 10:
-        raise ValueError(f"모델 응답 문제 수가 부족합니다: {len(parsed_list)}개 생성됨")
-    
-    print("\n=== [DEBUG] 파싱된 리스트 ===")
-    print(parsed_list)
-    print("============================\n")
+        raise ValueError(f"quiz 문제 수가 부족합니다: {len(parsed_list)}개 생성됨")
 
     quiz_items = [QuizItem(**item) for item in parsed_list]
 
-    print(f"\n 전체 퀴즈 응답 반환 완료: 총 {len(quiz_items)}문항")
+    print(f"\n 전체 quiz 응답 수: 총 {len(quiz_items)}문항")
 
     return FollowupResponse(
         message="quiz_generated",
