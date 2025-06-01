@@ -17,34 +17,28 @@ def parse_choices(raw_options: str) -> List[str]:
 
 
 def parse_response(response_text: str):
-    """
-    모델 응답 텍스트에서 문제/보기/정답/해설을 추출하여 리스트로 반환
-    """
-    # "난이도:" 부터 시작하도록 잘라내기 (프롬프트 내용 제거)
     start_index = response_text.find("난이도:")
     if start_index != -1:
         response_text = response_text[start_index:]
 
-    # 정규식 패턴 정의
     QUESTION_PATTERN = re.compile(
         r"#\s*난이도:\s*(?P<difficulty>하|중|상)\s*"
         r"#\s*문제:\s*(?P<question>.*?)\s*"
         r"#\s*선지:\s*\[(?P<choices>.*?)\]\s*"
         r"#\s*정답 인덱스:\s*(?P<answer_index>[1-4])\s*"
-        r"#\s*해설:\s*(?P<explanation>.*?)\s*(?=(#\s*난이도:|$))",
+        r"#\s*해설:\s*(?P<explanation>.*?)\s*(?=#\s*난이도:|$)",
         re.DOTALL
     )
 
-
     quiz_list = []
-    matches = re.findall(pattern, response_text)
+    matches = QUESTION_PATTERN.findall(response_text)  # <-- 여기 수정!
+
     valid_difficulties = {"상", "중", "하"}
 
     for i, match in enumerate(matches, 1):
         difficulty, question, options, answer_index, explanation = match
         option_list = parse_choices(options)
 
-        # 유효성 검사
         if len(option_list) != 4:
             print(f"[{i}] 1. 보기 항목 수가 4개가 아님:", option_list)
             continue
@@ -59,7 +53,7 @@ def parse_response(response_text: str):
             "difficulty": difficulty.strip(),
             "question": question.strip(),
             "options": option_list,
-            "answer_index": int(answer_index),
+            "answer_index": int(answer_index),  # 1부터 시작
             "explanation": explanation.strip()
         })
 
