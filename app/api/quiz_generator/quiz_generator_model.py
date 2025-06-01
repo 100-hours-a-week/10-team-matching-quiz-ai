@@ -34,11 +34,10 @@ def generate_quiz(prompt: str, max_tokens: int = 2000) -> str:
     output = model.generate(
         **inputs,
         max_new_tokens=max_tokens,
-        eos_token_id=tokenizer.eos_token_id,
         temperature=0.7,
         do_sample=True,
         top_k=80,
-        top_p=0.95
+        top_p=0.9
     )
 
     print("모델 응답 생성 완료")
