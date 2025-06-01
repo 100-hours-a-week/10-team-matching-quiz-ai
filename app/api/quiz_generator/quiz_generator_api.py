@@ -61,6 +61,10 @@ def generate_quiz_api(req: FollowupRequest):
     # 파싱 시도
     parsed_list = parse_response(raw_output)
 
+    # 여기서 문제 수가 10개인지 확인
+    if len(parsed_list) != 10:
+        raise ValueError(f"모델 응답 문제 수가 부족합니다: {len(parsed_list)}개 생성됨")
+    
     print("\n=== [DEBUG] 파싱된 리스트 ===")
     print(parsed_list)
     print("============================\n")
