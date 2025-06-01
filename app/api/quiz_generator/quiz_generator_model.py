@@ -26,7 +26,7 @@ model = AutoModelForCausalLM.from_pretrained(
 ).to(device)  
 
 # generate_quiz 함수 내에서도 입력을 같은 디바이스로 이동
-def generate_quiz(prompt: str, max_tokens: int = 1800) -> str:
+def generate_quiz(prompt: str, max_tokens: int = 2000) -> str:
     print("prompt 생성 및 디바이스 전송 중...")
     inputs = tokenizer(prompt, return_tensors="pt").to(device)  
 
@@ -34,6 +34,7 @@ def generate_quiz(prompt: str, max_tokens: int = 1800) -> str:
     output = model.generate(
         **inputs,
         max_new_tokens=max_tokens,
+        eos_token_id=tokenizer.eos_token_id,
         temperature=0.7,
         do_sample=True,
         top_k=80,
