@@ -26,10 +26,15 @@ def parse_response(response_text: str):
         response_text = response_text[start_index:]
 
     # 정규식 패턴 정의
-    pattern = re.compile(
-        r"난이도:\s*(.*?)\s*문제:\s*(.*?)\s*선지:\s*\[(.*?)\]\s*정답 인덱스:\s*(\d+)\s*해설:\s*(.*?)(?=\n난이도:|\Z)",
+    QUESTION_PATTERN = re.compile(
+        r"#\s*난이도:\s*(?P<difficulty>하|중|상)\s*"
+        r"#\s*문제:\s*(?P<question>.*?)\s*"
+        r"#\s*선지:\s*\[(?P<choices>.*?)\]\s*"
+        r"#\s*정답 인덱스:\s*(?P<answer_index>[1-4])\s*"
+        r"#\s*해설:\s*(?P<explanation>.*?)\s*(?=(#\s*난이도:|$))",
         re.DOTALL
     )
+
 
     quiz_list = []
     matches = re.findall(pattern, response_text)
