@@ -3,16 +3,12 @@ from typing import List
 
 
 def parse_choices(raw_options: str) -> List[str]:
-    """
-    보기 항목을 A. 보기1 B. 보기2 또는 쉼표 구분 형식에서 추출
-    """
-    # A. 보기 형식일 경우
     split_by_letter = re.findall(r"[A-D]\.\s*([^A-D]+?)(?=(?:[A-D]\.|$))", raw_options)
     if len(split_by_letter) == 4:
         return [opt.strip() for opt in split_by_letter]
 
-    # 쉼표(,) 형식일 경우
-    options = [opt.strip() for opt in raw_options.split(",")]
+    options = re.split(r"[,\n]", raw_options)
+    options = [opt.strip() for opt in options if opt.strip()]
     return options if len(options) == 4 else []
 
 
@@ -22,13 +18,14 @@ def parse_response(response_text: str):
         response_text = response_text[start_index:]
 
     QUESTION_PATTERN = re.compile(
-        r"#\s*난이도:\s*(?P<difficulty>하|중|상)\s*"
-        r"#\s*문제:\s*(?P<question>.*?)\s*"
-        r"#\s*선지:\s*\[(?P<choices>.*?)\]\s*"
-        r"#\s*정답 인덱스:\s*(?P<answer_index>[1-4])\s*"
-        r"#\s*해설:\s*(?P<explanation>.*?)\s*(?=#\s*난이도:|$)",
+        r"#\s*?난이도:\s*(?P<difficulty>하|중|상)\s*"
+        r"#\s*?문제:\s*(?P<question>.*?)\s*"
+        r"#\s*?선지:\s*\[(?P<choices>.*?)\]\s*"
+        r"#\s*?정답\s*인덱스:\s*(?P<answer_index>[1-4])\s*"
+        r"#\s*?해설:\s*(?P<explanation>.*?)(?=\n#\s*?난이도:|\Z)",
         re.DOTALL
     )
+
 
     quiz_list = []
     matches = QUESTION_PATTERN.findall(response_text)  # <-- 여기 수정!
