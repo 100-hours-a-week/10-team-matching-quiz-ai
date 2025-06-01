@@ -41,13 +41,13 @@ def parse_response(response_text: str):
 
         # 유효성 검사
         if len(option_list) != 4:
-            print(f"[{i}] ❌ 보기 항목 수가 4개가 아님:", option_list)
+            print(f"[{i}] 1. 보기 항목 수가 4개가 아님:", option_list)
             continue
         if difficulty.strip() not in valid_difficulties:
-            print(f"[{i}] ❌ 난이도 필드가 잘못됨:", difficulty)
+            print(f"[{i}] 2. 난이도 필드가 잘못됨:", difficulty)
             continue
         if not answer_index.isdigit() or not (1 <= int(answer_index) <= 4):
-            print(f"[{i}] ❌ 정답 인덱스가 유효하지 않음:", answer_index)
+            print(f"[{i}] 3. 정답 인덱스가 유효하지 않음:", answer_index)
             continue
 
         quiz_list.append({

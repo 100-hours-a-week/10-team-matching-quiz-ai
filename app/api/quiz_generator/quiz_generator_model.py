@@ -36,7 +36,7 @@ def generate_quiz(prompt: str, max_tokens: int = 1500) -> str:
         max_new_tokens=max_tokens,
         temperature=0.7,
         do_sample=True,
-        top_k=50,
+        top_k=80,
         top_p=0.95
     )
 

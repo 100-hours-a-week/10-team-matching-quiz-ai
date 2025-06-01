@@ -36,7 +36,7 @@ def generate_quiz_api(req: FollowupRequest):
         prompt = prompt_template.compile(joined=joined_questions)
     else:
         prompt = prompt_template.replace("{{joined}}", joined_questions)
-        prompt += "\n\n-출력은 위의 형식을 정확히 따르고, 반드시 JSON 형식으로 10문제를 연속 출력하시오. 다른 설명은 절대 포함하지 마세요."
+        prompt += "\n\n-출력은 위의 형식을 정확히 따르고, 반드시 10문제를 연속 출력하시오. 다른 설명은 절대 포함하지 마세요."
 
 
     print("\n=== [DEBUG] 최종 프롬프트 내용 ===\n")
