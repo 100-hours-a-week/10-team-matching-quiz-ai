@@ -1,39 +1,53 @@
 import re
 from typing import List
 
+
 def parse_choices(raw_options: str) -> List[str]:
-    # A. ~ B. ~ 형식 처리
+    """
+    보기 항목을 A. 보기1 B. 보기2 또는 쉼표 구분 형식에서 추출
+    """
+    # A. 보기 형식일 경우
     split_by_letter = re.findall(r"[A-D]\.\s*([^A-D]+?)(?=(?:[A-D]\.|$))", raw_options)
     if len(split_by_letter) == 4:
         return [opt.strip() for opt in split_by_letter]
-    # 쉼표 기준 처리
+
+    # 쉼표(,) 형식일 경우
     options = [opt.strip() for opt in raw_options.split(",")]
     return options if len(options) == 4 else []
 
+
 def parse_response(response_text: str):
-    # 필요 없는 머리말 제거
+    """
+    모델 응답 텍스트에서 문제/보기/정답/해설을 추출하여 리스트로 반환
+    """
+    # "난이도:" 부터 시작하도록 잘라내기 (프롬프트 내용 제거)
     start_index = response_text.find("난이도:")
     if start_index != -1:
         response_text = response_text[start_index:]
 
+    # 정규식 패턴 정의
     pattern = re.compile(
         r"난이도:\s*(.*?)\s*문제:\s*(.*?)\s*선지:\s*\[(.*?)\]\s*정답 인덱스:\s*(\d+)\s*해설:\s*(.*?)(?=\n난이도:|\Z)",
         re.DOTALL
     )
-    
+
     quiz_list = []
     matches = re.findall(pattern, response_text)
     valid_difficulties = {"상", "중", "하"}
-    
-    for match in matches:
+
+    for i, match in enumerate(matches, 1):
         difficulty, question, options, answer_index, explanation = match
         option_list = parse_choices(options)
 
+        # 유효성 검사
         if len(option_list) != 4:
-            print("보기 항목 수가 4개가 아님:", option_list)
+            print(f"[{i}] ❌ 보기 항목 수가 4개가 아님:", option_list)
             continue
         if difficulty.strip() not in valid_difficulties:
-            print("난이도 필드가 잘못됨:", difficulty)
+            print(f"[{i}] ❌ 난이도 필드가 잘못됨:", difficulty)
+            continue
+        if not answer_index.isdigit() or not (1 <= int(answer_index) <= 4):
+            print(f"[{i}] ❌ 정답 인덱스가 유효하지 않음:", answer_index)
             continue
 
         quiz_list.append({
