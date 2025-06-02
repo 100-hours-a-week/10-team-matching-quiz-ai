@@ -43,6 +43,6 @@ def generate_quiz(prompt: str, max_tokens: int = 1500) -> str:
         top_p=0.9,
         repetition_penalty=1.05
     )
-
+    print("[DEBUG] 모델 generate 호출 결과:", output)
     print("quiz 생성 완료")
     return tokenizer.decode(output[0], skip_special_tokens=True)

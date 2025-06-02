@@ -55,6 +55,7 @@ def generate_quiz_api(req: FollowupRequest):
     print("quiz generate 시작")
     raw_output = generate_quiz(prompt)
     print("quiz 생성 완료")
+    print("\n=== [DEBUG] 모델 응답 원문 ===\n", raw_output, "\n")
 
     # LLM 응답 처리 span
     if trace:
