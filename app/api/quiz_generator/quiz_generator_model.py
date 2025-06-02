@@ -26,17 +26,12 @@ model = AutoModelForCausalLM.from_pretrained(
 ).to(device)  
 
 
-def generate_quiz(prompt: str, max_tokens: int = 4000) -> str:
+def generate_quiz(prompt: str, max_tokens: int = 1500) -> str:
     print("prompt 생성 및 디바이스 전송 중...")
 
-    # 출력 시작을 유도할 prefix
-    prefix = "문제 1  \n난이도: 하  \n문제: "
-    
-    # prefix를 prompt에 붙여줌
-    full_prompt = prompt + "\n" + prefix
-
-    # tokenizer 처리
-    inputs = tokenizer(full_prompt, return_tensors="pt").to(device)
+    # prompt 길이 제한 적용
+    max_context = 4096 - max_tokens
+    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_context).to(device)
 
     print("quiz generate 시작")
     output = model.generate(
@@ -49,6 +44,10 @@ def generate_quiz(prompt: str, max_tokens: int = 4000) -> str:
         repetition_penalty=1.05,
         stream=False
     )
+
+    print("quiz 생성 완료")
+    return tokenizer.decode(output[0], skip_special_tokens=True)
+
 
     print("quiz 생성 완료")
     return tokenizer.decode(output[0], skip_special_tokens=True)
