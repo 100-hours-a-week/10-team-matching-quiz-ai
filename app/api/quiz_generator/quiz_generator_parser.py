@@ -58,14 +58,13 @@ def parse_response(response_text: str):
 
     # Quiz 정규식 추출
     QUESTION_PATTERN = re.compile(
-        r"#\s*?난이도:\s*(?P<difficulty>하|중|상)\s*"
-        r"#\s*?문제:\s*(?P<question>.*?)\s*"
-        r"#\s*?선지:\s*\[(?P<choices>.*?)\]\s*"
-        r"#\s*?정답\s*인덱스:\s*(?P<answer_index>[1-4])\s*"
-        r"#\s*?해설:\s*(?P<explanation>.*?)(?=\n#\s*?난이도:|\Z)",
+        r"난이도:\s*(?P<difficulty>하|중|상)\s*"
+        r"문제:\s*(?P<question>.*?)\s*"
+        r"선지:\s*\[(?P<choices>.*?)\]\s*"
+        r"정답\s*인덱스:\s*(?P<answer_index>[1-4])\s*"
+        r"해설:\s*(?P<explanation>.*?)(?=\n난이도:|\Z)",
         re.DOTALL
     )
-
 
     quiz_list = []
     matches = QUESTION_PATTERN.findall(response_text) 
