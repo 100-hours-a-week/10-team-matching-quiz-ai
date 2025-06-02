@@ -37,7 +37,8 @@ def generate_quiz(prompt: str, max_tokens: int = 3000) -> str:
         temperature=0.7,
         do_sample=True,
         top_k=80,
-        top_p=0.9
+        top_p=0.9,
+        stream=False
     )
 
     print("quiz 생성 완료")
