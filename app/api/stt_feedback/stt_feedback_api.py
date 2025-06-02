@@ -1,13 +1,23 @@
-from fastapi import APIRouter, UploadFile, File
+from fastapi import APIRouter, HTTPException
 from app.api.stt_feedback.stt_feedback_model import FeedbackResponse
-from app.api.stt_feedback.stt_feedback_service import transcribe_audio, generate_feedback
+from app.api.stt_feedback.stt_feedback_service import run_feedback_pipeline
+from app.api.stt_feedback.stt_feedback_schema import VoiceFeedbackRequest
 
 router = APIRouter()
 
-#TODO: file 가져오기 test 필요 (방법 추가 확인인)
 @router.post("/feedback", response_model=FeedbackResponse)
-async def feedback_from_audio(file: UploadFile = File(...)):
-    audio_bytes = await file.read()
-    transcript = transcribe_audio(audio_bytes)
-    feedback = generate_feedback(transcript)
-    return FeedbackResponse(transcript=transcript, feedback=feedback)
+async def receive_feedback(request: VoiceFeedbackRequest):
+    if not request.questionLists:
+        raise HTTPException(
+            status_code=400,
+            detail="questionLists가 비어 있습니다."
+        )
+
+    # 전체 처리: STT + 피드백 + 모범답안 생성
+    result = run_feedback_pipeline(
+        interview_id=request.interview_id,
+        recording_url=request.recording_url,
+        questionLists=[q.dict(by_alias=True) for q in request.questionLists]
+    )
+
+    return result
