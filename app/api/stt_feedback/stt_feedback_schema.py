@@ -1,19 +1,44 @@
-from pydantic import BaseModel, HttpUrl, Field
 from enum import Enum
-from typing import Dict
+from typing import Dict, List, Optional, Any
+from pydantic import BaseModel, Field, HttpUrl
 
-class FeedbackStatus(str, Enum):
-    success = "success"
-    failed = "failed"
-    pending = "pending"
+# 요청 스키마 (Request)
 
-class STTSubmitRequest(BaseModel):
-    task_id: str = Field(..., description="작업 ID")
-    audio_gcs_uri: HttpUrl
-    callback_url: HttpUrl
+# 질문 별 상세 내용 : 시작(초), 종료(초), 질문별 Interview id, 질문 내용
+class QuestionItem(BaseModel):
+    from_: int = Field(..., alias="from", description="답변 시작 시간 (초)")
+    to: int = Field(..., description="답변 끝 시간 (초)")
+    interview_id: str = Field(..., description="질문이 속한 인터뷰 ID")
+    question: str = Field(..., description="질문 내용")
 
-class STTFeedbackRequest(BaseModel):
-    task_id: str
-    audio_url: HttpUrl
-    feedback: Dict[str, str]
-    status: FeedbackStatus
+# audio 음성(S3), 질문 리스트
+class VoiceFeedbackRequest(BaseModel):
+    recording_url: HttpUrl = Field(..., description="S3에 저장된 전체 음성 URL")
+    questionLists: List[QuestionItem]
+
+
+# 응답 스키마 (Response)
+class StandardResponse(BaseModel):
+    message: str
+    data: Optional[Any] = None
+
+
+# 400 - 요청 형식 오류
+class InvalidRequestResponse(BaseModel):
+    message: str = "invalid_request"
+    data: Dict[str, str]  # 예: { "reason": "questionLists가 비어 있음" }
+
+# 401 - 토큰 만료
+class TokenExpiredResponse(BaseModel):
+    message: str = "token_expired"
+    data: Optional[None] = None
+
+# 409 - 중복 제출
+class AlreadySubmittedResponse(BaseModel):
+    message: str = "already_submit"
+    data: Optional[None] = None
+
+# 500 - 서버 오류
+class InternalServerErrorResponse(BaseModel):
+    message: str = "internal_server_error"
+    data: Optional[None] = None
