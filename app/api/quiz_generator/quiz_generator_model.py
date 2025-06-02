@@ -46,7 +46,3 @@ def generate_quiz(prompt: str, max_tokens: int = 1500) -> str:
 
     print("quiz 생성 완료")
     return tokenizer.decode(output[0], skip_special_tokens=True)
-
-
-    print("quiz 생성 완료")
-    return tokenizer.decode(output[0], skip_special_tokens=True)

@@ -62,7 +62,7 @@ def generate_quiz_api(req: FollowupRequest):
         span_llm.update(status="success")
 
     # 파싱 시도
-    parsed_list = parse_response(raw_output, verbose=True)
+    parsed_list = parse_response(raw_output)
 
     # 먼저 전체 형식이 맞는 퀴즈 수만 체크 (여기선 에러 발생 안 함)
     print(f"[DEBUG] 총 형식이 맞는 문제 수: {len(parsed_list)}개")
