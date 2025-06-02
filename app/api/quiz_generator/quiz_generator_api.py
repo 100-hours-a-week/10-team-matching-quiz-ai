@@ -22,12 +22,17 @@ langfuse = Langfuse(
 def generate_quiz_api(req: FollowupRequest):
     print(" 요청 수신: /generate_quiz")
 
-    trace = langfuse.trace(
-        name="quiz_generation",
-        user_id=req.interview_id,
-        tags=["quiz", "generate"],
-        metadata={"endpoint": "/generate_quiz"}
-    )
+    try:
+        trace = langfuse.trace(
+            name="quiz_generation",
+            user_id=req.interview_id,
+            tags=["quiz", "generate"],
+            metadata={"endpoint": "/generate_quiz"}
+        )
+    except Exception as e:
+        print(f"[WARN] Langfuse trace 시작 실패: {e}")
+        trace = None
+
 
     prompt_template = langfuse.get_prompt("quiz_generation")
     joined_questions = "\n".join(req.question_history_list)
@@ -64,7 +69,11 @@ def generate_quiz_api(req: FollowupRequest):
 
     # 파싱 시도
     parsed_list = parse_response(raw_output)
-
+    if not parsed_list:
+        if trace:
+            trace.span(name="parsing_error", input=raw_output).update(status="error")
+        raise ValueError("형식에 맞는 퀴즈를 하나도 파싱하지 못했습니다.")
+    
     # 먼저 전체 형식이 맞는 퀴즈 수만 체크 (여기선 에러 발생 안 함)
     print(f"[DEBUG] 총 형식이 맞는 문제 수: {len(parsed_list)}개")
 
