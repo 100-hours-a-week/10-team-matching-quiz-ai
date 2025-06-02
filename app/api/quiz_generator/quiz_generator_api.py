@@ -26,7 +26,7 @@ def generate_quiz_api(req: FollowupRequest):
         name="quiz_generation",
         user_id=req.interview_id,
         tags=["quiz", "generate"],
-        metadata={"endpoint": "/quiz/generate_quiz"}
+        metadata={"endpoint": "/generate_quiz"}
     )
 
     prompt_template = langfuse.get_prompt("quiz_generation")
@@ -36,7 +36,15 @@ def generate_quiz_api(req: FollowupRequest):
         prompt = prompt_template.compile(joined=joined_questions)
     else:
         prompt = prompt_template.replace("{{joined}}", joined_questions)
-        prompt += "\n\n-출력은 위의 형식을 정확히 따르고, 반드시 최소 15문제를 연속 출력하시오. 다른 설명은 절대 포함하지 마세요."
+    prompt += (
+        "\n\n- 출력은 반드시 다음 형식을 따를 것:\n"
+        "난이도: 하|중|상\n"
+        "문제: (문장)\n"
+        "선지: [1. ..., 2. ..., 3. ..., 4. ...]\n"
+        "정답 인덱스: (1~4)\n"
+        "해설: (문장)\n\n"
+        "- 위 형식 그대로 15~20문제를 연속 출력하시오. 설명은 포함하지 말고 문제만 출력하시오."
+    )
 
     # prompt 생성 span
     if trace:
@@ -54,18 +62,38 @@ def generate_quiz_api(req: FollowupRequest):
         span_llm.update(status="success")
 
     # 파싱 시도
-    parsed_list = parse_response(raw_output)
+    parsed_list = parse_response(raw_output, verbose=True)
+
+    # 먼저 전체 형식이 맞는 퀴즈 수만 체크 (여기선 에러 발생 안 함)
+    print(f"[DEBUG] 총 형식이 맞는 문제 수: {len(parsed_list)}개")
+
+    # 난이도별 필터링 (이 함수가 하4/중3/상3으로 엄격하게 뽑음)
     final_quizzes = filter_and_select_quizzes(parsed_list)
 
+    # 난이도별 충족 안 될 때만 에러
     if len(final_quizzes) != 10:
+        # 각 난이도 개수 확인
+        easy = len([q for q in parsed_list if q["difficulty"] == "하"])
+        medium = len([q for q in parsed_list if q["difficulty"] == "중"])
+        hard = len([q for q in parsed_list if q["difficulty"] == "상"])
+
         if trace:
-            span_error = trace.span(name="validation_error", input=raw_output)
-            span_error.update(status="error", metadata={"reason": f"{len(final_quizzes)}개 생성됨"})
-        raise ValueError(f"형식이 맞는 퀴즈가 부족합니다: {len(final_quizzes)}개 추출됨")
+            trace.span(name="filtering_error", input=str(parsed_list)).update(
+                status="error",
+                metadata={
+                    "reason": f"난이도별 문제 부족",
+                    "하": easy,
+                    "중": medium,
+                    "상": hard
+                }
+            )
+        raise ValueError(f"난이도별 문제 부족 - 하:{easy}, 중:{medium}, 상:{hard}")
 
     quiz_items = [QuizItem(**item) for item in final_quizzes]
 
     print(f"\n 전체 quiz 응답 수: 총 {len(quiz_items)}문항")
+
+    trace.update(status="success")
 
     return FollowupResponse(
         message="quiz_generated",

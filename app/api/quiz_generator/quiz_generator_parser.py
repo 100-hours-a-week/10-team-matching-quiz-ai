@@ -12,11 +12,8 @@ def parse_choices(raw_options: str) -> List[str]:
     options = [opt.strip() for opt in options if opt.strip()]
     return options if len(options) == 4 else []
 
-
+# Quiz 형식 검증 함수
 def is_valid_quiz_item(item: Dict) -> bool:
-    """
-    문제 형식이 정상적인지 검증하는 함수
-    """
     if not item.get("question"): return False
     if not isinstance(item.get("options"), list): return False
     if len(item["options"]) != 4: return False
@@ -25,12 +22,8 @@ def is_valid_quiz_item(item: Dict) -> bool:
     if not item.get("explanation"): return False
     return True
 
-
+# 생성된 Quiz 중 10문제 선별
 def filter_and_select_quizzes(quizzes: List[Dict]) -> List[Dict]:
-    """
-    전체 생성된 문제 리스트에서 형식이 올바른 것만 추출한 뒤,
-    난이도 하 4개, 중 3개, 상 3개를 고정된 순서로 선택
-    """
     # 형식 검증
     valid_quizzes = [q for q in quizzes if is_valid_quiz_item(q)]
 
@@ -58,6 +51,12 @@ def parse_response(response_text: str):
     if start_index != -1:
         response_text = response_text[start_index:]
 
+    # 프롬프트 설명 제거
+    first_quiz_start = response_text.find("난이도:")
+    if first_quiz_start != -1:
+        response_text = response_text[first_quiz_start:]
+
+    # Quiz 정규식 추출
     QUESTION_PATTERN = re.compile(
         r"#\s*?난이도:\s*(?P<difficulty>하|중|상)\s*"
         r"#\s*?문제:\s*(?P<question>.*?)\s*"
@@ -70,7 +69,6 @@ def parse_response(response_text: str):
 
     quiz_list = []
     matches = QUESTION_PATTERN.findall(response_text) 
-
     valid_difficulties = {"상", "중", "하"}
 
     for i, match in enumerate(matches, 1):
