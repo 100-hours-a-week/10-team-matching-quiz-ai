@@ -23,7 +23,6 @@ def init_question_vector_store_from_csv(csv_path: str):
     df = pd.read_csv(csv_path, quotechar='"', on_bad_lines='skip')
     questions = df["question"].dropna().tolist()
     
-    # 중복 제거
     questions = list(set(questions))
     print(f"중복 제거 후 총 {len(questions)}개의 질문을 임베딩 중...")
     
@@ -42,7 +41,7 @@ def init_quiz_vector_store_from_json(json_path: str):
         rag_data = json.load(f)
 
     documents = []
-    seen_docs = set()  # 중복 체크용
+    seen_docs = set() 
 
     for i, item in enumerate(rag_data):
         doc_parts = []
@@ -58,10 +57,9 @@ def init_quiz_vector_store_from_json(json_path: str):
         if comparison and comparison.strip():
             doc_parts.append(f"비교 내용: {comparison.strip()}")
 
-        if doc_parts:  # 빈 문서가 아닌 경우만
+        if doc_parts: 
             full_doc = "\n\n".join(doc_parts)
             
-            # 중복 체크
             if full_doc not in seen_docs:
                 documents.append(full_doc)
                 seen_docs.add(full_doc)
@@ -76,11 +74,9 @@ def init_all_vector_stores():
     """모든 벡터스토어 초기화"""
     print("=== 벡터스토어 초기화 시작 ===")
     
-    # 꼬리질문용 벡터스토어 초기화
     init_question_vector_store_from_csv("app/vector_db/question_data.csv")
     
-    # 퀴즈용 벡터스토어 초기화
-    init_quiz_vector_store_from_json("app/vector_db/rag_data.json")
+    init_quiz_vector_store_from_json("app/vector_db/rag-data.json")
     
     print("=== 벡터스토어 초기화 완료 ===")
 

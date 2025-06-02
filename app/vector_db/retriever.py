@@ -130,48 +130,72 @@ def question_rag_retriever(
         logging.warning(f"RAG 검색 실패: {e}")
         return []
 
-def quiz_rag_retriever_batch(
+def quiz_rag_retriever(
     questions: List[str],
     top_k: int = 3,
     sim_threshold: float = 0.7
-) -> List[Dict[str, Union[str, List[Dict[str, Union[str, float]]]]]]:
+) -> List[Dict[str, any]]:
     """
-    여러 개의 질문에 대해 RAG 검색 수행
+    여러 개의 질문에 대해 RAG 검색을 수행하여 각각의 결과를 반환
     """
+    if not questions:
+        logging.warning("검색할 질문이 없습니다.")
+        return []
+    
     results = []
-
+    
     try:
-        # 임베딩 한 번에 처리
+        logging.info(f"퀴즈 RAG 검색 시작: {len(questions)}개 질문 처리")
+        
         question_embeds = embed_texts(questions, enrich_type='quiz')
+        
         all_docs = get_all_quiz_documents_with_vectors()
-
+        
+        if not all_docs:
+            logging.warning("검색할 문서가 없습니다.")
+            return [{"질문": q, "결과": []} for q in questions]
+        
         for idx, question in enumerate(questions):
-            question_vec = np.array(question_embeds[idx])
-            matched_docs = []
-
-            for doc_id, doc_text, doc_vec in all_docs:
-                similarity = safe_cosine_similarity(question_vec, np.array(doc_vec))
+            logging.debug(f"질문 {idx+1}/{len(questions)} 처리 중: '{question[:50]}...'")
+            
+            try:
+                question_vec = np.array(question_embeds[idx])
+                matched_docs = []
                 
-                if similarity >= sim_threshold:
-                    matched_docs.append({
-                        "document_id": doc_id,
-                        "content": doc_text,
-                        "similarity": round(similarity, 4)
-                    })
-
-            sorted_docs = sorted(matched_docs, key=lambda x: x["similarity"], reverse=True)
-
-            results.append({
-                "질문": question,
-                "결과": sorted_docs[:top_k]
-            })
-
+                for doc_id, doc_text, doc_vec in all_docs:
+                    similarity = safe_cosine_similarity(question_vec, np.array(doc_vec))
+                    
+                    if similarity >= sim_threshold:
+                        matched_docs.append({
+                            "document_id": doc_id,
+                            "content": doc_text,
+                            "similarity": round(similarity, 4)
+                        })
+                
+                sorted_docs = sorted(matched_docs, key=lambda x: x["similarity"], reverse=True)[:top_k]
+                
+                question_result = {
+                    "result": sorted_docs
+                }
+                
+                results.append(question_result)
+                
+                logging.debug(f"질문 '{question[:30]}...' 검색 완료: {len(sorted_docs)}개 문서 매칭")
+                
+            except Exception as e:
+                logging.error(f"질문 '{question[:30]}...' 검색 실패: {e}")
+                results.append({
+                    "result": []
+                })
+        
+        logging.info(f"퀴즈 RAG 검색 완료: {len(results)}개 결과 반환")
+        
     except Exception as e:
-        logging.warning(f"퀴즈 RAG 배치 검색 실패: {e}")
+        logging.error(f"퀴즈 RAG 배치 검색 실패: {e}")
+        results = []
         for question in questions:
             results.append({
-                "질문": question,
-                "결과": []
+                "result": []
             })
-
+    
     return results

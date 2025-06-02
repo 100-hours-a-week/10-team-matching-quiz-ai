@@ -1,5 +1,6 @@
 import re
-from typing import List
+from typing import List, Dict
+import random
 
 
 def parse_choices(raw_options: str) -> List[str]:
@@ -10,6 +11,46 @@ def parse_choices(raw_options: str) -> List[str]:
     options = re.split(r"[,\n]", raw_options)
     options = [opt.strip() for opt in options if opt.strip()]
     return options if len(options) == 4 else []
+
+
+def is_valid_quiz_item(item: Dict) -> bool:
+    """
+    문제 형식이 정상적인지 검증하는 함수
+    """
+    if not item.get("question"): return False
+    if not isinstance(item.get("options"), list): return False
+    if len(item["options"]) != 4: return False
+    if not isinstance(item.get("answer_index"), int): return False
+    if not (1 <= item["answer_index"] <= 4): return False
+    if not item.get("explanation"): return False
+    return True
+
+
+def filter_and_select_quizzes(quizzes: List[Dict]) -> List[Dict]:
+    """
+    전체 생성된 문제 리스트에서 형식이 올바른 것만 추출한 뒤,
+    난이도 하 4개, 중 3개, 상 3개를 고정된 순서로 선택
+    """
+    # 형식 검증
+    valid_quizzes = [q for q in quizzes if is_valid_quiz_item(q)]
+
+    # 난이도별 분리
+    easy = [q for q in valid_quizzes if q["difficulty"] == "하"]
+    medium = [q for q in valid_quizzes if q["difficulty"] == "중"]
+    hard = [q for q in valid_quizzes if q["difficulty"] == "상"]
+
+    # 조건에 맞게 개수만큼 추출 (순서 고정)
+    selected = (
+        easy[:4] +
+        medium[:3] +
+        hard[:3]
+    )
+
+    # 문제 번호 붙이기
+    for i, q in enumerate(selected, 1):
+        q["number"] = i
+
+    return selected
 
 
 def parse_response(response_text: str):
@@ -28,7 +69,7 @@ def parse_response(response_text: str):
 
 
     quiz_list = []
-    matches = QUESTION_PATTERN.findall(response_text)  # <-- 여기 수정!
+    matches = QUESTION_PATTERN.findall(response_text) 
 
     valid_difficulties = {"상", "중", "하"}
 
