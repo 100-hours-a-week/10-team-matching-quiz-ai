@@ -41,8 +41,7 @@ def generate_quiz(prompt: str, max_tokens: int = 1500) -> str:
         do_sample=True,
         top_k=80,
         top_p=0.9,
-        repetition_penalty=1.05,
-        stream=False
+        repetition_penalty=1.05
     )
 
     print("quiz 생성 완료")
