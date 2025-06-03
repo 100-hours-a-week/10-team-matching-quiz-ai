@@ -45,7 +45,7 @@ def generate_quiz_api(req: FollowupRequest):
         "\n\n- 출력은 반드시 다음 형식을 따를 것:\n"
         "난이도: 하|중|상\n"
         "문제: (문장)\n"
-        "선지: [1. ..., 2. ..., 3. ..., 4. ...]\n"
+        "선지: [..., ..., ..., ...]\n"
         "정답 인덱스: (1~4)\n"
         "해설: (문장)\n\n"
         "- 위 형식 그대로 15~20문제를 연속 출력하시오. 설명은 포함하지 말고 문제만 출력하시오."
@@ -60,7 +60,6 @@ def generate_quiz_api(req: FollowupRequest):
     print("quiz generate 시작")
     raw_output = generate_quiz(prompt)
     print("quiz 생성 완료")
-    print("\n=== [DEBUG] 모델 응답 원문 ===\n", raw_output, "\n")
 
     # LLM 응답 처리 span
     if trace:
