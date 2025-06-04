@@ -56,8 +56,9 @@ def generate_quiz_api(req: FollowupRequest):
     if hasattr(prompt_template, "compile"):
         prompt = prompt_template.compile(**context_api)
     else:
-        prompt = prompt_template.replace("{{joined_questions}}", joined_questions)
-        prompt = prompt_template.replace("{{related_questions}}", related_questions_text)
+        prompt_text = str(prompt_template)
+        prompt = prompt_text.replace("{{joined_questions}}", joined_questions)
+        prompt = prompt.replace("{{related_questions}}", related_questions_text)
 
     prompt += (
         "\n\n- 출력은 반드시 다음 형식을 따를 것:\n"
