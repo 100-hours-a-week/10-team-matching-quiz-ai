@@ -4,7 +4,7 @@ from transformers import AutoTokenizer, AutoModelForCausalLM
 from huggingface_hub import login
 from app.api.quiz_generator.quiz_generator_config import QUIZ_MODEL_NAME, QUIZ_HF_TOKEN
 
-# 디바이스 설정
+# 디바이스 및 dtype 설정
 if torch.cuda.is_available():
     device = "cuda"
     dtype = torch.float16
@@ -16,25 +16,20 @@ else:
     dtype = torch.float32
 print(f"디바이스 설정됨: {device}")
 
-# Hugging Face 로그인
+# Hugging Face 토큰 로그인
 login(QUIZ_HF_TOKEN)
 
-# 모델 디렉토리 경로 설정
-local_model_dir = f"./models/{QUIZ_MODEL_NAME.split('/')[-1]}"
-
-# 토크나이저 로딩
+# 토크나이저 로딩 (로컬 아님, 모델 이름 직접 사용)
 tokenizer = AutoTokenizer.from_pretrained(
-    local_model_dir,
-    trust_remote_code=True,
-    local_files_only=True
+    QUIZ_MODEL_NAME,
+    trust_remote_code=True
 )
 
-# 모델 로딩 (양자화된 모델은 quantization_config 필요 없음)
+# 모델 로딩 (양자화된 모델이면 transformers가 자동 인식)
 model = AutoModelForCausalLM.from_pretrained(
-    local_model_dir,
+    QUIZ_MODEL_NAME,
     trust_remote_code=True,
-    local_files_only=True,
-    device_map="auto",  # CUDA나 MPS 환경에서 자동으로 분배
+    device_map="auto",
     torch_dtype=dtype
 ).to(device)
 
