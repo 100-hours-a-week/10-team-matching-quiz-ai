@@ -35,7 +35,7 @@ model = AutoModelForCausalLM.from_pretrained(
     local_model_dir,
     trust_remote_code=True,
     device_map="auto",
-    quantization_config=quant_config,
+    load_in_8bit=True,
     torch_dtype=torch.float16 if device != "cpu" else torch.float32,
 ).to(device)
 
