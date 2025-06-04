@@ -1,13 +1,8 @@
 import os
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
 from huggingface_hub import login
 from app.api.quiz_generator.quiz_generator_config import QUIZ_MODEL_NAME, QUIZ_HF_TOKEN
-from app.api.quiz_generator.quiz_generator_utils import (
-    ensure_config_json,
-    ensure_quantization_config,
-    ensure_tokenizer_files,
-)
 
 # 디바이스 설정
 if torch.cuda.is_available():
@@ -18,20 +13,20 @@ else:
     device = "cpu"
 print(f"디바이스 설정됨: {device}")
 
-# 모델 디렉토리 정의
-model_dir = f"./models/{QUIZ_MODEL_NAME.split('/')[-1]}"
-
-# config / tokenizer / quantization 관련 파일 자동 생성
-ensure_config_json(model_dir, QUIZ_MODEL_NAME)
-ensure_quantization_config(model_dir)
-ensure_tokenizer_files(QUIZ_MODEL_NAME, model_dir, QUIZ_HF_TOKEN)
-
-# === 실행 ===
+# Hugging Face 로그인
 login(QUIZ_HF_TOKEN)
 
-# Hugging Face 모델명에서 로컬 경로 추출
+# 모델 디렉토리
 local_model_dir = f"./models/{QUIZ_MODEL_NAME.split('/')[-1]}"
-ensure_config_json(local_model_dir, QUIZ_MODEL_NAME)
+
+# BitsAndBytes 양자화 설정
+quant_config = BitsAndBytesConfig(
+    load_in_8bit=True,
+    quant_method="bitsandbytes",
+    bnb_4bit_use_double_quant=False,
+    bnb_4bit_quant_type="nf4",
+    bnb_4bit_compute_dtype=torch.float16
+)
 
 # 토크나이저 로딩
 tokenizer = AutoTokenizer.from_pretrained(local_model_dir, trust_remote_code=True)
@@ -39,10 +34,10 @@ tokenizer = AutoTokenizer.from_pretrained(local_model_dir, trust_remote_code=Tru
 # 모델 로딩
 model = AutoModelForCausalLM.from_pretrained(
     local_model_dir,
-    torch_dtype=torch.float16 if device != "cpu" else torch.float32,
-    trust_remote_code=True,
     device_map="auto",
-    load_in_8bit=True
+    trust_remote_code=True,
+    quantization_config=quant_config,
+    torch_dtype=torch.float16 if device != "cpu" else torch.float32,
 ).to(device)
 
 
@@ -52,7 +47,6 @@ def generate_quiz(prompt: str, max_tokens: int = 2500) -> str:
     prompt_tokens = tokenizer(prompt)['input_ids']
     print(f"[DEBUG] Prompt token 수: {len(prompt_tokens)}")
 
-    # prompt 길이 제한 적용
     max_context = 4096 - max_tokens
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_context).to(device)
 
