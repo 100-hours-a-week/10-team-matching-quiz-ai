@@ -41,8 +41,8 @@ def generate_quiz(prompt: str, max_tokens: int = 3000) -> str:
     print(f"[DEBUG] Prompt token 수: {len(prompt_tokens)}")
 
     # context window 제한
-    max_context = 8196 - max_tokens
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_context).to(device)
+    # max_context = 8196 - max_tokens
+    # inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_context).to(device)
 
     print("quiz generate 시작")
     output = model.generate(
