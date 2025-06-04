@@ -1,6 +1,13 @@
 from fastapi import APIRouter
-from app.api.quiz_generator.quiz_generator_schema import FollowupRequest, FollowupResponse, QuizItem
-from app.api.quiz_generator.quiz_generator_parser import parse_response, filter_and_select_quizzes
+from app.api.quiz_generator.quiz_generator_schema import (
+    FollowupRequest,
+    FollowupResponse,
+    QuizItem,
+)
+from app.api.quiz_generator.quiz_generator_parser import (
+    parse_response,
+    filter_and_select_quizzes,
+)
 from app.api.quiz_generator.quiz_generator_model import generate_quiz
 from app.api.quiz_generator.quiz_generator_config import (
     QUIZ_LANGFUSE_SECRET_KEY,
@@ -19,38 +26,51 @@ langfuse = Langfuse(
     host=QUIZ_LANGFUSE_HOST,
 )
 
+
 @router.post("/generate_quiz", response_model=FollowupResponse)
 def generate_quiz_api(req: FollowupRequest):
     print(" 요청 수신: /generate_quiz")
 
     try:
         trace = langfuse.trace(
+            id=req.interview_id,
             name="quiz_generation",
-            user_id=req.interview_id,
             tags=["quiz", "generate"],
-            metadata={"endpoint": "/generate_quiz"}
+            input={"question_list": req.question_history_list},
+            metadata={"endpoint": "/generate_quiz"},
         )
     except Exception as e:
         print(f"[WARN] Langfuse trace 시작 실패: {e}")
         trace = None
-    
+
     prompt_template = langfuse.get_prompt("quiz_generation")
     quiz_rag = quiz_rag_retriever(req.question_history_list)
 
-    # RAG 결과에서 관련 질문들 추출 
+    # RAG 결과에서 관련 질문들 추출
     related_questions = []
     for rag_result in quiz_rag:
-        if rag_result.get('result'):
-            for doc in rag_result['result']:
-                if 'content' in doc:
-                    related_questions.append(doc['content'])
+        if rag_result.get("result"):
+            for doc in rag_result["result"]:
+                if "content" in doc:
+                    related_questions.append(doc["content"])
 
     joined_questions = "\n".join(req.question_history_list)
-    related_questions_text = "\n".join(related_questions) if related_questions else "관련 문서 없음"
+    print(joined_questions)
+    related_questions_text = (
+        "\n".join(related_questions) if related_questions else "관련 문서 없음"
+    )
+
+    if trace:
+        rag_trace = trace.span(name="rag_trace")
+        rag_trace.update(
+            input={"rag_input": req.question_history_list},
+            output={"rag_output": quiz_rag},
+        )
+        rag_trace.end()
 
     context_api = {
-        "joined_questions": joined_questions,
-        "related_questions": related_questions_text  
+        "joined": joined_questions,
+        "related_questions": related_questions_text,
     }
 
     if hasattr(prompt_template, "compile"):
@@ -69,12 +89,11 @@ def generate_quiz_api(req: FollowupRequest):
         "해설: (문장)\n\n"
         "- 위 형식 그대로 15~20문제를 연속 출력하시오. 설명은 포함하지 말고 문제만 출력하시오."
     )
-    
 
     # prompt 생성 span
     if trace:
         span_prompt = trace.span(name="build_prompt")
-        span_prompt.update(input={"prompt" : prompt})
+        span_prompt.update(input={"prompt": prompt})
         span_prompt.end()
 
     # LLM 호출
@@ -85,17 +104,21 @@ def generate_quiz_api(req: FollowupRequest):
     # LLM 응답 처리 span
     if trace:
         span_llm = trace.span(name="llm_response")
-        span_llm.update(input={"prompt":prompt}, output={"raw_output":raw_output})
+        span_llm.update(input={"prompt": prompt}, output={"raw_output": raw_output})
         span_llm.end()
 
     # 파싱 시도
-    parsed_llm = trace.span(name="parsed_question")
+    if trace:
+        parsed_llm = trace.span(name="parsed_question")
+    else:
+        parsed_llm = None
+
     parsed_list = parse_response(raw_output)
     if not parsed_list:
         if trace:
             trace.span(name="parsing_error", input=raw_output).update(status="error")
         raise ValueError("형식에 맞는 퀴즈를 하나도 파싱하지 못했습니다.")
-    
+
     # 먼저 전체 형식이 맞는 퀴즈 수만 체크 (여기선 에러 발생 안 함)
     print(f"[DEBUG] 총 형식이 맞는 문제 수: {len(parsed_list)}개")
 
@@ -116,8 +139,8 @@ def generate_quiz_api(req: FollowupRequest):
                     "reason": f"난이도별 문제 부족",
                     "하": easy,
                     "중": medium,
-                    "상": hard
-                }
+                    "상": hard,
+                },
             )
         raise ValueError(f"난이도별 문제 부족 - 하:{easy}, 중:{medium}, 상:{hard}")
 
@@ -125,13 +148,16 @@ def generate_quiz_api(req: FollowupRequest):
 
     print(f"\n 전체 quiz 응답 수: 총 {len(quiz_items)}문항")
 
-    parsed_llm.update(input={"prompt":prompt}, output={"parsed_output":parsed_list})
-    parsed_llm.end()
-    
+    if parsed_llm:
+        parsed_llm.update(
+            input={"raw_output": raw_output}, output={"parsed_output": parsed_list}
+        )
+        parsed_llm.end()
+
+    if trace:
+        trace.update(output={"parsed_output": parsed_list})
+
     return FollowupResponse(
         message="quiz_generated",
-        data={
-            "user_id": req.interview_id,
-            "questions": quiz_items
-        }
+        data={"user_id": req.interview_id, "questions": quiz_items},
     )
