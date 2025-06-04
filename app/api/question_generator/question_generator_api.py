@@ -42,6 +42,7 @@ MAX_HISTORY_QUESTIONS = int(os.getenv("MAX_HISTORY_QUESTIONS", 20))
 
 _prompt_cache = {}
 
+
 def get_cached_prompt(prompt_name: str):
     """프롬프트를 캐시에서 가져오거나, 없으면 Langfuse에서 로드하여 캐시에 저장"""
     if prompt_name not in _prompt_cache:
@@ -50,8 +51,9 @@ def get_cached_prompt(prompt_name: str):
         logger.info(f"프롬프트 캐시 저장 완료: {prompt_name}")
     else:
         logger.debug(f"프롬프트 캐시 히트: {prompt_name}")
-    
+
     return _prompt_cache[prompt_name]
+
 
 def validate_request(req: FollowupRequest) -> None:
     """입력 요청 유효성 검사"""
@@ -142,8 +144,10 @@ async def generate_additional_questions(
     existing_questions: List[str],
 ) -> List[str]:
     """질문 개수가 부족할 시 추가질문을 생성"""
-    logger.info(f"OpenAI API로 추가 질문 생성 시작: interview_id={req.interview_id}, remaining_count={remaining_count}")
-    
+    logger.info(
+        f"OpenAI API로 추가 질문 생성 시작: interview_id={req.interview_id}, remaining_count={remaining_count}"
+    )
+
     context_api = {
         "selected_question": req.selected_question,
         "keyword": req.keyword or "",
@@ -179,11 +183,15 @@ async def generate_additional_questions(
         result = existing_questions.copy()
         result.extend(unique_questions)
 
-        logger.info(f"OpenAI API로 추가 질문 생성 완료: interview_id={req.interview_id}, generated_count={len(additional_questions)}, unique_count={len(unique_questions)}")
+        logger.info(
+            f"OpenAI API로 추가 질문 생성 완료: interview_id={req.interview_id}, generated_count={len(additional_questions)}, unique_count={len(unique_questions)}"
+        )
 
         return result[:GENERATE_COUNT]
     except Exception as e:
-        logger.error(f"OpenAI API 추가 질문 생성 실패: interview_id={req.interview_id}, error={str(e)}")
+        logger.error(
+            f"OpenAI API 추가 질문 생성 실패: interview_id={req.interview_id}, error={str(e)}"
+        )
         if not llm_span_api.ended:
             llm_span_api.end(error=str(e))
         raise
@@ -265,17 +273,19 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
     )
 
     try:
-        logger.info(f"OpenAI API를 통한 질문 생성 시작: interview_id={req.interview_id}")
-        
+        logger.info(
+            f"OpenAI API를 통한 질문 생성 시작: interview_id={req.interview_id}"
+        )
+
         context = prepare_context(req, trace)
-        
+
         context_api = {
             "selected_question": req.selected_question,
             "keyword": req.keyword or "",
             "passed_questions": context["passed_questions"],
             "num_questions": GENERATE_COUNT,
         }
-        
+
         prompt_template_api = get_cached_prompt("followup_questions_generator_api")
         prompt_api = prompt_template_api.compile(**context_api)
 
@@ -302,7 +312,9 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
             )
 
         except Exception as e:
-            logger.error(f"OpenAI API 질문 생성 실패: interview_id={req.interview_id}, error={str(e)}")
+            logger.error(
+                f"OpenAI API 질문 생성 실패: interview_id={req.interview_id}, error={str(e)}"
+            )
             if not llm_span_api.ended:
                 llm_span_api.end(error=str(e))
             raise
