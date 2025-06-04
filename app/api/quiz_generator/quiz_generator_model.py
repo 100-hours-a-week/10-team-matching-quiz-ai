@@ -68,6 +68,8 @@ model = AutoModelForCausalLM.from_pretrained(
     local_model_dir,
     torch_dtype=torch.float16 if device != "cpu" else torch.float32,
     trust_remote_code=True,
+    device_map="auto",
+    load_in_8bit=True
 ).to(device)
 
 
