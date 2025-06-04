@@ -8,6 +8,7 @@ from app.api.quiz_generator.quiz_generator_config import (
     QUIZ_LANGFUSE_HOST,
 )
 from langfuse import Langfuse
+from app.vector_db.retriever import quiz_rag_retriever
 
 router = APIRouter()
 
@@ -32,15 +33,32 @@ def generate_quiz_api(req: FollowupRequest):
     except Exception as e:
         print(f"[WARN] Langfuse trace 시작 실패: {e}")
         trace = None
-
-
+    
     prompt_template = langfuse.get_prompt("quiz_generation")
+    quiz_rag = quiz_rag_retriever(req.question_history_list)
+
+    # RAG 결과에서 관련 질문들 추출 
+    related_questions = []
+    for rag_result in quiz_rag:
+        if rag_result.get('result'):
+            for doc in rag_result['result']:
+                if 'content' in doc:
+                    related_questions.append(doc['content'])
+
     joined_questions = "\n".join(req.question_history_list)
+    related_questions_text = "\n".join(related_questions) if related_questions else "관련 문서 없음"
+
+    context_api = {
+        "joined_questions": joined_questions,
+        "related_questions": related_questions_text  
+    }
 
     if hasattr(prompt_template, "compile"):
-        prompt = prompt_template.compile(joined=joined_questions)
+        prompt = prompt_template.compile(**context_api)
     else:
-        prompt = prompt_template.replace("{{joined}}", joined_questions)
+        prompt = prompt_template.replace("{{joined_questions}}", joined_questions)
+        prompt = prompt_template.replace("{{related_questions}}", related_questions_text)
+
     prompt += (
         "\n\n- 출력은 반드시 다음 형식을 따를 것:\n"
         "난이도: 하|중|상\n"
