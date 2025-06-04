@@ -1,9 +1,13 @@
 import os
-import json
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from huggingface_hub import login, snapshot_download
+from huggingface_hub import login
 from app.api.quiz_generator.quiz_generator_config import QUIZ_MODEL_NAME, QUIZ_HF_TOKEN
+from app.api.quiz_generator.quiz_generator_utils import (
+    ensure_config_json,
+    ensure_quantization_config,
+    ensure_tokenizer_files,
+)
 
 # 디바이스 설정
 if torch.cuda.is_available():
@@ -14,66 +18,13 @@ else:
     device = "cpu"
 print(f"디바이스 설정됨: {device}")
 
-# config.json 자동 생성 함수
-def ensure_config_json(model_dir: str, model_name: str):
-    config_path = os.path.join(model_dir, "config.json")
-    if os.path.exists(config_path):
-        print("[INFO] config.json 이미 존재함")
-        return
-    
-    os.makedirs(model_dir, exist_ok=True)
-    config_data = {
-        "_name_or_path": model_name,
-        "model_type": "qwen3",
-        "architectures": ["QWenLMHeadModel"],
-        "trust_remote_code": True,
-        "quantization_config": {
-            "quant_method": "gptq",
-            "bits": 8,
-            "group_size": 128,
-            "desc_act": False
-        }
-    }
-    with open(config_path, "w") as f:
-        json.dump(config_data, f, indent=2)
-    print(f"config.json 생성 완료: {config_path}")
+# 모델 디렉토리 정의
+model_dir = f"./models/{QUIZ_MODEL_NAME.split('/')[-1]}"
 
-# 로컬 모델 경로
-local_model_dir = "./models/DeepSeek-R1-0528-Qwen3-8B-MLX-8bit"
-
-# quantization_config.json 경로
-quant_config_path = os.path.join(local_model_dir, "quantization_config.json")
-
-# quantization_config.json이 없을 경우 자동 생성
-if not os.path.exists(quant_config_path):
-    print("[INFO] quantization_config.json 자동 생성 중...")
-    quant_config = {
-        "quant_method": "bitsandbytes", 
-        "load_in_8bit": True,
-        "bnb_4bit_use_double_quant": False,
-        "bnb_4bit_quant_type": "nf4",
-        "bnb_4bit_compute_dtype": "float16"
-    }
-    with open(quant_config_path, "w") as f:
-        json.dump(quant_config, f, indent=2, ensure_ascii=False)
-    print("[INFO] quantization_config.json 생성 완료")
-else:
-    print("[INFO] quantization_config.json 이미 존재함")
-
-
-# 모델 전체 스냅샷을 저장
-local_model_dir = f"./models/{QUIZ_MODEL_NAME.split('/')[-1]}"
-if not os.path.exists(os.path.join(local_model_dir, "tokenizer_config.json")):
-    print("[INFO] tokenizer 관련 파일 다운로드 시작")
-    snapshot_download(
-        repo_id=QUIZ_MODEL_NAME,
-        local_dir=local_model_dir,
-        local_dir_use_symlinks=False,  # symlink 오류 방지
-        token=QUIZ_HF_TOKEN,
-        resume_download=True
-    )
-    print("tokenizer 관련 파일 다운로드 완료")
-
+# config / tokenizer / quantization 관련 파일 자동 생성
+ensure_config_json(model_dir, QUIZ_MODEL_NAME)
+ensure_quantization_config(model_dir)
+ensure_tokenizer_files(QUIZ_MODEL_NAME, model_dir, QUIZ_HF_TOKEN)
 
 # === 실행 ===
 login(QUIZ_HF_TOKEN)
