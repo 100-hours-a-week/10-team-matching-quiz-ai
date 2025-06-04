@@ -2,17 +2,18 @@ from fastapi import APIRouter
 from app.api.quiz_generator.quiz_generator_schema import (
     FollowupRequest,
     FollowupResponse,
-    QuizItem,
+    QuizItem
 )
 from app.api.quiz_generator.quiz_generator_parser import (
     parse_response,
     filter_and_select_quizzes,
+    remove_prompt_content
 )
 from app.api.quiz_generator.quiz_generator_model import generate_quiz
 from app.api.quiz_generator.quiz_generator_config import (
     QUIZ_LANGFUSE_SECRET_KEY,
     QUIZ_LANGFUSE_PUBLIC_KEY,
-    QUIZ_LANGFUSE_HOST,
+    QUIZ_LANGFUSE_HOST
 )
 from langfuse import Langfuse
 from app.vector_db.retriever import quiz_rag_retriever
@@ -23,7 +24,7 @@ router = APIRouter()
 langfuse = Langfuse(
     secret_key=QUIZ_LANGFUSE_SECRET_KEY,
     public_key=QUIZ_LANGFUSE_PUBLIC_KEY,
-    host=QUIZ_LANGFUSE_HOST,
+    host=QUIZ_LANGFUSE_HOST
 )
 
 
@@ -101,6 +102,9 @@ def generate_quiz_api(req: FollowupRequest):
     raw_output = generate_quiz(prompt)
     print("quiz 생성 완료")
 
+    # 프롬프트 내용 제거
+    cleaned_output = remove_prompt_content(raw_output)
+
     # LLM 응답 처리 span
     if trace:
         span_llm = trace.span(name="llm_response")
@@ -113,10 +117,10 @@ def generate_quiz_api(req: FollowupRequest):
     else:
         parsed_llm = None
 
-    parsed_list = parse_response(raw_output)
+    parsed_list = parse_response(cleaned_output)
     if not parsed_list:
         if trace:
-            trace.span(name="parsing_error", input=raw_output).update(status="error")
+            trace.span(name="parsing_error", input=cleaned_output).update(status="error")
         raise ValueError("형식에 맞는 퀴즈를 하나도 파싱하지 못했습니다.")
 
     # 먼저 전체 형식이 맞는 퀴즈 수만 체크 (여기선 에러 발생 안 함)

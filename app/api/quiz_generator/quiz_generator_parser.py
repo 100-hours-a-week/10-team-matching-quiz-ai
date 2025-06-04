@@ -98,3 +98,12 @@ def parse_response(response_text: str):
         })
 
     return quiz_list
+
+
+# 확실하게 프롬프트를 제거하고 출력
+def remove_prompt_content(output: str) -> str:
+    lines = output.strip().splitlines()
+    for i, line in enumerate(lines):
+        if line.strip().startswith("난이도:"):
+            return "\n".join(lines[i:])  # 첫 문제부터 자름
+    return output
