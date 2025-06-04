@@ -40,7 +40,7 @@ def generate_quiz(prompt: str, max_tokens: int = 2500) -> str:
     prompt_tokens = tokenizer(prompt)['input_ids']
     print(f"[DEBUG] Prompt token 수: {len(prompt_tokens)}")
 
-    # context window 제한 (예: 4096 토큰 기준)
+    # context window 제한
     max_context = 4096 - max_tokens
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_context).to(device)
 
@@ -54,8 +54,9 @@ def generate_quiz(prompt: str, max_tokens: int = 2500) -> str:
         top_p=0.9,
         repetition_penalty=1.05
     )
-
-    print("[DEBUG] 모델 generate 호출 결과:", output)
+    
+    decoded = tokenizer.decode(output[0], skip_special_tokens=True)
+    print("=== [DEBUG] 디코딩된 모델 출력 ===")
+    print(decoded)
     print("quiz 생성 완료")
-
-    return tokenizer.decode(output[0], skip_special_tokens=True)
+    return decoded
