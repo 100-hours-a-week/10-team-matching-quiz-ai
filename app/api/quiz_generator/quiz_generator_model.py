@@ -38,6 +38,28 @@ def ensure_config_json(model_dir: str, model_name: str):
         json.dump(config_data, f, indent=2)
     print(f"config.json 생성 완료: {config_path}")
 
+# 로컬 모델 경로
+local_model_dir = "./models/DeepSeek-R1-0528-Qwen3-8B-MLX-8bit"
+
+# quantization_config.json 경로
+quant_config_path = os.path.join(local_model_dir, "quantization_config.json")
+
+# quantization_config.json이 없을 경우 자동 생성
+if not os.path.exists(quant_config_path):
+    print("[INFO] quantization_config.json 자동 생성 중...")
+    quant_config = {
+        "quant_method": "bitsandbytes", 
+        "load_in_8bit": True,
+        "bnb_4bit_use_double_quant": False,
+        "bnb_4bit_quant_type": "nf4",
+        "bnb_4bit_compute_dtype": "float16"
+    }
+    with open(quant_config_path, "w") as f:
+        json.dump(quant_config, f, indent=2, ensure_ascii=False)
+    print("[INFO] quantization_config.json 생성 완료")
+else:
+    print("[INFO] quantization_config.json 이미 존재함")
+
 
 # 모델 전체 스냅샷을 저장
 local_model_dir = f"./models/{QUIZ_MODEL_NAME.split('/')[-1]}"
