@@ -22,11 +22,11 @@ local_model_dir = f"./models/{QUIZ_MODEL_NAME.split('/')[-1]}"
 # BitsAndBytes 양자화 설정
 quant_config = BitsAndBytesConfig(
     load_in_8bit=True,
-    quant_method="bitsandbytes",
     bnb_4bit_use_double_quant=False,
     bnb_4bit_quant_type="nf4",
-    bnb_4bit_compute_dtype=torch.float16
+    bnb_4bit_compute_dtype=torch.float16,
 )
+
 
 # 토크나이저 로딩
 tokenizer = AutoTokenizer.from_pretrained(local_model_dir, trust_remote_code=True)
