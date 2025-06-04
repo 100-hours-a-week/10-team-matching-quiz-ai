@@ -1,6 +1,6 @@
 import os
 import torch
-from transformers import AutoTokenizer, AutoModelForCausalLM, BitsAndBytesConfig
+from transformers import AutoTokenizer, AutoModelForCausalLM
 from huggingface_hub import login
 from app.api.quiz_generator.quiz_generator_config import QUIZ_MODEL_NAME, QUIZ_HF_TOKEN
 
@@ -16,29 +16,19 @@ print(f"디바이스 설정됨: {device}")
 # Hugging Face 로그인
 login(QUIZ_HF_TOKEN)
 
-# 모델 디렉토리 (ex: ./models/DeepSeek-R1-0528-Qwen3-8B-MLX-8bit)
+# 모델 디렉토리 경로 설정
 local_model_dir = f"./models/{QUIZ_MODEL_NAME.split('/')[-1]}"
-
-# BitsAndBytes 양자화 설정
-quant_config = BitsAndBytesConfig(
-    load_in_8bit=True,  # 8비트 양자화
-    bnb_4bit_use_double_quant=False,
-    bnb_4bit_quant_type="nf4",
-    bnb_4bit_compute_dtype=torch.float16
-)
 
 # 토크나이저 로딩
 tokenizer = AutoTokenizer.from_pretrained(local_model_dir, trust_remote_code=True)
 
-# 모델 로딩
+# 모델 로딩 (양자화된 모델이므로 quantization_config X)
 model = AutoModelForCausalLM.from_pretrained(
     local_model_dir,
     trust_remote_code=True,
     device_map="auto",
-    load_in_8bit=True,
-    torch_dtype=torch.float16 if device != "cpu" else torch.float32,
+    torch_dtype=torch.float16 if device != "cpu" else torch.float32
 ).to(device)
-
 
 # 퀴즈 생성 함수
 def generate_quiz(prompt: str, max_tokens: int = 2500) -> str:
@@ -47,7 +37,7 @@ def generate_quiz(prompt: str, max_tokens: int = 2500) -> str:
     prompt_tokens = tokenizer(prompt)['input_ids']
     print(f"[DEBUG] Prompt token 수: {len(prompt_tokens)}")
 
-    # context window 제한 (예: 4096 토큰)
+    # context window 제한 (예: 4096 토큰 기준)
     max_context = 4096 - max_tokens
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_context).to(device)
 
