@@ -16,17 +16,16 @@ print(f"디바이스 설정됨: {device}")
 # Hugging Face 로그인
 login(QUIZ_HF_TOKEN)
 
-# 모델 디렉토리
+# 모델 디렉토리 (ex: ./models/DeepSeek-R1-0528-Qwen3-8B-MLX-8bit)
 local_model_dir = f"./models/{QUIZ_MODEL_NAME.split('/')[-1]}"
 
 # BitsAndBytes 양자화 설정
 quant_config = BitsAndBytesConfig(
-    load_in_8bit=True,
+    load_in_8bit=True,  # 8비트 양자화
     bnb_4bit_use_double_quant=False,
     bnb_4bit_quant_type="nf4",
-    bnb_4bit_compute_dtype=torch.float16,
+    bnb_4bit_compute_dtype=torch.float16
 )
-
 
 # 토크나이저 로딩
 tokenizer = AutoTokenizer.from_pretrained(local_model_dir, trust_remote_code=True)
@@ -34,19 +33,21 @@ tokenizer = AutoTokenizer.from_pretrained(local_model_dir, trust_remote_code=Tru
 # 모델 로딩
 model = AutoModelForCausalLM.from_pretrained(
     local_model_dir,
-    device_map="auto",
     trust_remote_code=True,
+    device_map="auto",
     quantization_config=quant_config,
     torch_dtype=torch.float16 if device != "cpu" else torch.float32,
 ).to(device)
 
 
+# 퀴즈 생성 함수
 def generate_quiz(prompt: str, max_tokens: int = 2500) -> str:
     print("prompt 생성 및 디바이스 전송 중...")
 
     prompt_tokens = tokenizer(prompt)['input_ids']
     print(f"[DEBUG] Prompt token 수: {len(prompt_tokens)}")
 
+    # context window 제한 (예: 4096 토큰)
     max_context = 4096 - max_tokens
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_context).to(device)
 
@@ -60,6 +61,8 @@ def generate_quiz(prompt: str, max_tokens: int = 2500) -> str:
         top_p=0.9,
         repetition_penalty=1.05
     )
+
     print("[DEBUG] 모델 generate 호출 결과:", output)
     print("quiz 생성 완료")
+
     return tokenizer.decode(output[0], skip_special_tokens=True)
