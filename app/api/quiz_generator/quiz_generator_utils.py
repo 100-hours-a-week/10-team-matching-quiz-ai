@@ -13,13 +13,7 @@ def ensure_config_json(model_dir: str, model_name: str):
         "_name_or_path": model_name,
         "model_type": "qwen3",
         "architectures": ["QWenLMHeadModel"],
-        "trust_remote_code": True,
-        "quantization_config": {
-            "quant_method": "gptq",
-            "bits": 8,
-            "group_size": 128,
-            "desc_act": False
-        }
+        "trust_remote_code": True
     }
     with open(config_path, "w") as f:
         json.dump(config_data, f, indent=2)
@@ -32,11 +26,12 @@ def ensure_quantization_config(model_dir: str):
         return
 
     quant_config = {
-        "quant_method": "bitsandbytes",
-        "load_in_8bit": True,
+        "quant_method": "bitsandbytes",  
+        "bits": 8,
         "bnb_4bit_use_double_quant": False,
         "bnb_4bit_quant_type": "nf4",
-        "bnb_4bit_compute_dtype": "float16"
+        "bnb_4bit_compute_dtype": "float16",
+        "load_in_8bit": True 
     }
     with open(quant_config_path, "w") as f:
         json.dump(quant_config, f, indent=2, ensure_ascii=False)
