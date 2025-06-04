@@ -5,7 +5,8 @@ from app.api.stt_feedback.stt_feedback_schema import VoiceFeedbackRequest
 
 router = APIRouter()
 
-@router.post("/feedback", response_model=FeedbackResponse)
+# 피드백 생성
+@router.post("/generate", response_model=FeedbackResponse)
 async def receive_feedback(request: VoiceFeedbackRequest):
     if not request.questionLists:
         raise HTTPException(
