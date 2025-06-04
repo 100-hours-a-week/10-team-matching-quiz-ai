@@ -103,12 +103,16 @@ def parse_response(response_text: str):
 # 확실하게 프롬프트를 제거하고 출력
 def remove_prompt_content(output: str) -> str:
     """
-    LLM 출력에서 프롬프트 내용을 제거.
-    '--- END OF INSTRUCTION ---' 이후만 남김.
+    프롬프트로 보이는 안내문 제거 후, 문제 리스트만 추출.
     """
-    end_token = "--- END OF INSTRUCTION ---"
-    if end_token in output:
-        return output.split(end_token, 1)[-1].strip()
+    # '--- END OF INSTRUCTION ---' 기준 자르기
+    if "--- END OF INSTRUCTION ---" in output:
+        output = output.split("--- END OF INSTRUCTION ---", 1)[-1]
 
-    # fallback: 전체 출력 사용
+    # 문제 시작 지점 찾기 (ex: '난이도:' 또는 '문제:'로 시작하는 줄)
+    match = re.search(r"(난이도\s*:\s*(하|중|상)|문제\s*:)", output)
+    if match:
+        return output[match.start():].strip()
+
+    # 못 찾을 시 전체 반환 (fallback)
     return output.strip()

@@ -42,11 +42,13 @@ def generate_quiz(prompt: str, max_tokens: int = 2000) -> str:
 
     # context window 제한
     # max_context = 8196 - max_tokens
-    # inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_context).to(device)
+    inputs = tokenizer(prompt, return_tensors="pt"
+                       #, truncation=True, max_length=max_context
+                       ).to(device)
 
     print("quiz generate 시작")
     output = model.generate(
-        #**inputs,
+        **inputs,
         max_new_tokens=max_tokens,
         temperature=0.8,
         do_sample=True,
@@ -55,8 +57,6 @@ def generate_quiz(prompt: str, max_tokens: int = 2000) -> str:
         repetition_penalty=1.05
     )
     
-    decoded = tokenizer.decode(output[0], skip_special_tokens=True)
-    print("=== [DEBUG] 디코딩된 모델 출력 ===")
-    print(decoded)
     print("quiz 생성 완료")
+    decoded = tokenizer.decode(output[0], skip_special_tokens=True)
     return decoded
