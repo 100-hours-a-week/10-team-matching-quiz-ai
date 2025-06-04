@@ -7,10 +7,13 @@ from app.api.quiz_generator.quiz_generator_config import QUIZ_MODEL_NAME, QUIZ_H
 # 디바이스 설정
 if torch.cuda.is_available():
     device = "cuda"
+    dtype = torch.float16
 elif torch.backends.mps.is_available():
     device = "mps"
+    dtype = torch.float16
 else:
     device = "cpu"
+    dtype = torch.float32
 print(f"디바이스 설정됨: {device}")
 
 # Hugging Face 로그인
@@ -20,14 +23,19 @@ login(QUIZ_HF_TOKEN)
 local_model_dir = f"./models/{QUIZ_MODEL_NAME.split('/')[-1]}"
 
 # 토크나이저 로딩
-tokenizer = AutoTokenizer.from_pretrained(local_model_dir, trust_remote_code=True)
+tokenizer = AutoTokenizer.from_pretrained(
+    local_model_dir,
+    trust_remote_code=True,
+    local_files_only=True
+)
 
-# 모델 로딩 (양자화된 모델이므로 quantization_config X)
+# 모델 로딩 (양자화된 모델은 quantization_config 필요 없음)
 model = AutoModelForCausalLM.from_pretrained(
     local_model_dir,
     trust_remote_code=True,
-    device_map="auto",
-    torch_dtype=torch.float16 if device != "cpu" else torch.float32
+    local_files_only=True,
+    device_map="auto",  # CUDA나 MPS 환경에서 자동으로 분배
+    torch_dtype=dtype
 ).to(device)
 
 # 퀴즈 생성 함수
