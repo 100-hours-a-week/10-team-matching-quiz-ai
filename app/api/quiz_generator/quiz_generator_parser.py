@@ -20,6 +20,11 @@ def is_valid_quiz_item(item: Dict) -> bool:
     if not isinstance(item.get("answer_index"), int): return False
     if not (1 <= item["answer_index"] <= 4): return False
     if not item.get("explanation"): return False
+    
+    # 너무 긴 질문 / 해설은 제거 (프롬프트 출력 가능성 제외)
+    if len(item["question"]) > 150: return False
+    if len(item["explanation"]) > 200: return False
+
     return True
 
 # 생성된 Quiz 중 10문제 선별
