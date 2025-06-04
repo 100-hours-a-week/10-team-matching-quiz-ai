@@ -55,6 +55,7 @@ def generate_quiz(prompt: str, max_tokens: int = 3000) -> str:
         repetition_penalty=1.05
     )
     
-    print("quiz 생성 완료")
     decoded = tokenizer.decode(output[0], skip_special_tokens=True)
+    print("quiz 생성 완료")
+    print(decoded)
     return decoded
