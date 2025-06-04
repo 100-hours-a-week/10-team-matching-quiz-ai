@@ -2,7 +2,7 @@ import os
 import json
 import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
-from huggingface_hub import login
+from huggingface_hub import login, snapshot_download
 from app.api.quiz_generator.quiz_generator_config import QUIZ_MODEL_NAME, QUIZ_HF_TOKEN
 
 # 디바이스 설정
@@ -37,6 +37,21 @@ def ensure_config_json(model_dir: str, model_name: str):
     with open(config_path, "w") as f:
         json.dump(config_data, f, indent=2)
     print(f"config.json 생성 완료: {config_path}")
+
+
+# 모델 전체 스냅샷을 저장
+local_model_dir = f"./models/{QUIZ_MODEL_NAME.split('/')[-1]}"
+if not os.path.exists(os.path.join(local_model_dir, "tokenizer_config.json")):
+    print("[INFO] tokenizer 관련 파일 다운로드 시작")
+    snapshot_download(
+        repo_id=QUIZ_MODEL_NAME,
+        local_dir=local_model_dir,
+        local_dir_use_symlinks=False,  # symlink 오류 방지
+        token=QUIZ_HF_TOKEN,
+        resume_download=True
+    )
+    print("tokenizer 관련 파일 다운로드 완료")
+
 
 # === 실행 ===
 login(QUIZ_HF_TOKEN)
