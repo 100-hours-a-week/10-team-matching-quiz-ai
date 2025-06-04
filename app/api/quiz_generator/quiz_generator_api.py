@@ -68,6 +68,7 @@ def generate_quiz_api(req: FollowupRequest):
         "해설: (문장)\n\n"
         "- 위 형식 그대로 15~20문제를 연속 출력하시오. 설명은 포함하지 말고 문제만 출력하시오."
     )
+    
 
     # prompt 생성 span
     if trace:
@@ -124,6 +125,7 @@ def generate_quiz_api(req: FollowupRequest):
     print(f"\n 전체 quiz 응답 수: 총 {len(quiz_items)}문항")
 
     parsed_llm.update(input={"prompt":prompt}, output={"parsed_output":parsed_list})
+    parsed_llm.end()
     
     return FollowupResponse(
         message="quiz_generated",
