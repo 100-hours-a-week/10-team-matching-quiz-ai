@@ -34,7 +34,7 @@ model = AutoModelForCausalLM.from_pretrained(
 ).to(device)
 
 # 퀴즈 생성 함수
-def generate_quiz(prompt: str, max_tokens: int = 3000) -> str:
+def generate_quiz(prompt: str, max_tokens: int = 2048) -> str:
     print("prompt 생성 및 디바이스 전송 중...")
 
     prompt_tokens = tokenizer(prompt)['input_ids']
@@ -57,5 +57,4 @@ def generate_quiz(prompt: str, max_tokens: int = 3000) -> str:
     
     decoded = tokenizer.decode(output[0], skip_special_tokens=True)
     print("quiz 생성 완료")
-    print(decoded)
     return decoded
