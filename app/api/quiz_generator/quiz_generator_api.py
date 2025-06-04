@@ -34,7 +34,6 @@ def generate_quiz_api(req: FollowupRequest):
 
     try:
         trace = langfuse.trace(
-            id=req.interview_id,
             name="quiz_generation",
             tags=["quiz", "generate"],
             input={"question_list": req.question_history_list},
