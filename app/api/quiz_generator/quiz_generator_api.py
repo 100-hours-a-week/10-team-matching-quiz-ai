@@ -108,6 +108,10 @@ def generate_quiz_api(req: FollowupRequest):
 
     # 프롬프트 내용 제거
     cleaned_output = remove_prompt_content(raw_output)
+    
+    # 디버깅 출력 추가
+    print("[CLEANED OUTPUT PREVIEW]")
+    print(cleaned_output[:200]) 
 
     # LLM 응답 처리 span
     if trace:

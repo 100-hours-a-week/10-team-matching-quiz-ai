@@ -102,8 +102,13 @@ def parse_response(response_text: str):
 
 # 확실하게 프롬프트를 제거하고 출력
 def remove_prompt_content(output: str) -> str:
-    lines = output.strip().splitlines()
-    for i, line in enumerate(lines):
-        if line.strip().startswith("난이도:"):
-            return "\n".join(lines[i:])  # 첫 문제부터 자름
-    return output
+    """
+    LLM 출력에서 프롬프트 내용을 제거.
+    '--- END OF INSTRUCTION ---' 이후만 남김.
+    """
+    end_token = "--- END OF INSTRUCTION ---"
+    if end_token in output:
+        return output.split(end_token, 1)[-1].strip()
+
+    # fallback: 전체 출력 사용
+    return output.strip()
