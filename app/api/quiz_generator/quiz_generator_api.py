@@ -53,8 +53,9 @@ def generate_quiz_api(req: FollowupRequest):
 
     # prompt 생성 span
     if trace:
-        span_prompt = trace.span(name="build_prompt", input=prompt)
-        span_prompt.update(status="success")
+        span_prompt = trace.span(name="build_prompt")
+        span_prompt.update(input={"prompt" : prompt})
+        span_prompt.end()
 
     # LLM 호출
     print("quiz generate 시작")
@@ -63,10 +64,12 @@ def generate_quiz_api(req: FollowupRequest):
 
     # LLM 응답 처리 span
     if trace:
-        span_llm = trace.span(name="llm_response", input=prompt, output=raw_output)
-        span_llm.update(status="success")
+        span_llm = trace.span(name="llm_response")
+        span_llm.update(input={"prompt":prompt}, output={"raw_output":raw_output})
+        span_llm.end()
 
     # 파싱 시도
+    parsed_llm = trace.span(name="parsed_question")
     parsed_list = parse_response(raw_output)
     if not parsed_list:
         if trace:
@@ -102,8 +105,8 @@ def generate_quiz_api(req: FollowupRequest):
 
     print(f"\n 전체 quiz 응답 수: 총 {len(quiz_items)}문항")
 
-    trace.update(status="success")
-
+    parsed_llm.update(input={"prompt":prompt}, output={"parsed_output":parsed_list})
+    
     return FollowupResponse(
         message="quiz_generated",
         data={
