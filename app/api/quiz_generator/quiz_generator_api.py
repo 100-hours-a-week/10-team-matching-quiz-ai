@@ -103,8 +103,7 @@ def generate_quiz_api(req: FollowupRequest):
 
     # LLM 호출
     print("quiz generate 시작")
-    trace_id = trace.id if trace else None
-    raw_output = generate_quiz(prompt, trace_id=trace_id)
+    raw_output = generate_quiz(prompt)
     print("quiz 생성 완료")
 
     # 프롬프트 내용 제거

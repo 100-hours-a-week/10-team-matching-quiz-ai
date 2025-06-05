@@ -5,29 +5,15 @@ from app.config.model_config import ModelConfig
 import logging
 import os
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, Union, TYPE_CHECKING
+from typing import Dict, Any, Optional, Union
 from enum import Enum
 import sys
-
-# TYPE_CHECKING을 사용하여 순환 import 방지
-if TYPE_CHECKING:
-    from app.vector_db.utils import get_embedding_model, get_keyword_model
 
 logger_sys = logging.getLogger("sys_path_check")
 logger_sys.info(f"Current sys.path: {sys.path}")
 
-# 환경에 따른 로깅 레벨 설정
-log_level = (
-    logging.DEBUG if os.getenv("DEBUG", "false").lower() == "true" else logging.INFO
-)
-
 logging.basicConfig(
-    level=log_level,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        # 필요시 파일 핸들러 추가 가능
-    ],
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
@@ -114,13 +100,10 @@ class VLLMModelWrapper(BaseModelWrapper):
         """vLLM 모델 즉시 초기화"""
         self.status = ModelStatus.INITIALIZING
         try:
-            # 환경별 최적화 설정 적용
-            vllm_config = ModelConfig.get_vllm_config()
-            if ModelConfig.is_gcp_environment():
-                os.environ["VLLM_GPU_MEMORY_UTILIZATION"] = str(
-                    vllm_config["gpu_memory_utilization"]
-                )
-                os.environ["VLLM_MAX_MODEL_LEN"] = str(vllm_config["max_model_len"])
+            # GCP 환경 최적화
+            if is_gcp_environment():
+                os.environ["VLLM_GPU_MEMORY_UTILIZATION"] = "0.7"
+                os.environ["VLLM_MAX_MODEL_LEN"] = "2048"
 
             from app.api.question_generator.question_generator_model import (
                 initialize_llm,
@@ -195,13 +178,12 @@ class LazyTransformersModelWrapper(BaseModelWrapper):
 
             logger.info(f"{self.model_name} (Transformers) 지연 초기화를 시도합니다...")
 
-            # 환경별 최적화 설정 적용
-            transformers_config = ModelConfig.get_transformers_config()
-            if ModelConfig.is_gcp_environment():
-                os.environ["TORCH_DTYPE"] = transformers_config["torch_dtype"]
-                os.environ["LOW_CPU_MEM_USAGE"] = str(
-                    transformers_config["low_cpu_mem_usage"]
-                ).lower()
+            # GCP 환경 최적화
+            if is_gcp_environment():
+                os.environ["TORCH_DTYPE"] = (
+                    "float16" if ENVIRONMENT == "gcp-gke" else "float32"
+                )
+                os.environ["LOW_CPU_MEM_USAGE"] = "true"
 
             model, tokenizer = initialize_quiz_model()
             self._model_data = {
@@ -241,21 +223,12 @@ class LazyTransformersModelWrapper(BaseModelWrapper):
         """Transformers 모델 정리"""
         if self._model_data:
             try:
-                # torch import를 안전하게 처리
-                try:
-                    import torch
+                import torch
 
-                    if torch.cuda.is_available():
-                        torch.cuda.empty_cache()
-                    elif torch.backends.mps.is_available():
-                        torch.mps.empty_cache()
-                except ImportError:
-                    logger.warning(
-                        "torch 모듈을 찾을 수 없어 GPU 메모리 정리를 건너뜁니다."
-                    )
-
-                # 모델 데이터 초기화
-                self._model_data = None
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                elif torch.backends.mps.is_available():
+                    torch.mps.empty_cache()
                 logger.info(f"{self.model_name} 정리 완료")
             except Exception as e:
                 logger.error(f"{self.model_name} 정리 중 오류: {e}")
@@ -296,9 +269,7 @@ class ModelManager:
                 else:
                     logger.warning("question_generator 즉시 초기화 실패")
             except Exception as e:
-                logger.error(
-                    f"question_generator 즉시 초기화 중 예외 발생: {e}", exc_info=True
-                )
+                logger.error(f"question_generator 즉시 초기화 중 예외 발생: {e}")
 
         # quiz_generator는 지연 로딩 준비만
         if "quiz_generator" in ENABLED_MODELS:
@@ -345,19 +316,9 @@ class ModelManager:
 
     def cleanup_all_models(self):
         """모든 모델 정리"""
-        logger.info("모든 모델 정리를 시작합니다...")
-        cleanup_count = 0
-
-        for name, wrapper in self._models.items():
+        for wrapper in self._models.values():
             if wrapper.status == ModelStatus.READY:
-                try:
-                    logger.info(f"{name} 모델 정리 중...")
-                    wrapper.cleanup()
-                    cleanup_count += 1
-                except Exception as e:
-                    logger.error(f"{name} 모델 정리 중 오류 발생: {e}", exc_info=True)
-
-        logger.info(f"총 {cleanup_count}개 모델이 정리되었습니다.")
+                wrapper.cleanup()
 
 
 # 전역 모델 관리자
@@ -381,7 +342,7 @@ except ImportError:
 
 def is_gcp_environment() -> bool:
     """GCP 환경인지 확인"""
-    return ModelConfig.is_gcp_environment()
+    return ENVIRONMENT.startswith("gcp-")
 
 
 def _sync_global_models():
@@ -489,8 +450,6 @@ def get_model_manager() -> ModelManager:
 # 개선된 헬스체크 엔드포인트
 @app.get("/health")
 async def health_check():
-    """기본 헬스체크 - 간단한 상태 정보"""
-    config_summary = ModelConfig.get_config_summary()
     return {
         "status": "healthy",
         "environment": ENVIRONMENT,
@@ -499,150 +458,17 @@ async def health_check():
         "memory_limit": MEMORY_LIMIT,
         "model_details": model_manager.get_all_model_status(),
         "loading_strategy": {"vllm": "immediate", "transformers": "lazy"},
-        "config": config_summary,
     }
-
-
-# 시스템 상세 상태 확인 엔드포인트
-@app.get("/health/detailed")
-async def detailed_health_check():
-    """상세 헬스체크 - 포괄적인 시스템 상태"""
-    return check_system_health()
 
 
 # 모델별 상세 상태 확인 엔드포인트
 @app.get("/health/models")
 async def models_health_check():
-    """모델 전용 헬스체크"""
     return {
         "models": model_manager.get_all_model_status(),
         "summary": {
             "total_models": len(model_manager._models),
             "available_models": len(get_available_models()),
             "enabled_models": ENABLED_MODELS,
-            "memory_info": get_memory_info(),
         },
     }
-
-
-# 시스템 유틸리티 함수들
-def get_memory_info() -> Dict[str, Any]:
-    """시스템 메모리 정보 조회"""
-    memory_info = {"backend": "unknown", "available": False}
-
-    try:
-        # torch를 안전하게 import
-        try:
-            import torch
-
-            if torch.cuda.is_available():
-                allocated = torch.cuda.memory_allocated() / 1024**3
-                reserved = torch.cuda.memory_reserved() / 1024**3
-                total = torch.cuda.get_device_properties(0).total_memory / 1024**3
-                memory_info = {
-                    "backend": "cuda",
-                    "available": True,
-                    "allocated_gb": round(allocated, 2),
-                    "reserved_gb": round(reserved, 2),
-                    "total_gb": round(total, 2),
-                    "free_gb": round(total - reserved, 2),
-                    "utilization_percent": round(reserved / total * 100, 1),
-                }
-            elif torch.backends.mps.is_available():
-                memory_info = {
-                    "backend": "mps",
-                    "available": True,
-                    "memory_monitoring": "limited",
-                }
-            else:
-                memory_info = {"backend": "cpu", "available": True, "unlimited": True}
-        except ImportError:
-            memory_info = {
-                "backend": "cpu",
-                "available": False,
-                "error": "torch not available",
-            }
-    except Exception as e:
-        logger.warning(f"메모리 정보 조회 실패: {e}")
-        memory_info["error"] = str(e)
-
-    return memory_info
-
-
-def check_system_health() -> Dict[str, Any]:
-    """시스템 전반적인 상태 체크"""
-
-    # Langfuse 연결 상태 확인
-    langfuse_status = check_langfuse_connection()
-
-    health_status = {
-        "timestamp": logger.name,  # 현재 시간 대신 로거 이름 사용
-        "environment": ENVIRONMENT,
-        "models": {
-            "total": len(model_manager._models),
-            "available": len(model_manager.get_available_models()),
-            "status": model_manager.get_all_model_status(),
-        },
-        "memory": get_memory_info(),
-        "vector_db": VECTOR_DB_AVAILABLE,
-        "langfuse": langfuse_status,
-        "config": ModelConfig.get_config_summary(),
-    }
-
-    # 전반적인 건강 상태 판단
-    available_models = len(model_manager.get_available_models())
-    if available_models == 0:
-        health_status["overall_status"] = "critical"
-        health_status["message"] = "사용 가능한 모델이 없습니다"
-    elif available_models < len(ENABLED_MODELS):
-        health_status["overall_status"] = "warning"
-        health_status["message"] = "일부 모델이 사용 불가능합니다"
-    else:
-        health_status["overall_status"] = "healthy"
-        health_status["message"] = "모든 시스템이 정상 작동 중입니다"
-
-    return health_status
-
-
-def check_langfuse_connection() -> Dict[str, Any]:
-    """Langfuse 연결 상태 확인"""
-    try:
-        from langfuse import Langfuse
-
-        # Question Generator Langfuse 확인
-        question_langfuse = Langfuse(
-            secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-            public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-            host=os.getenv("LANGFUSE_HOST"),
-        )
-
-        # Quiz Generator Langfuse 확인
-        quiz_langfuse = Langfuse(
-            secret_key=os.getenv("QUIZ_LANGFUSE_SECRET_KEY"),
-            public_key=os.getenv("QUIZ_LANGFUSE_PUBLIC_KEY"),
-            host=os.getenv("LANGFUSE_HOST"),
-        )
-
-        return {
-            "available": True,
-            "question_generator": {
-                "host": os.getenv("LANGFUSE_HOST"),
-                "public_key": (
-                    os.getenv("LANGFUSE_PUBLIC_KEY")[:10] + "..."
-                    if os.getenv("LANGFUSE_PUBLIC_KEY")
-                    else None
-                ),
-            },
-            "quiz_generator": {
-                "host": os.getenv("LANGFUSE_HOST"),
-                "public_key": (
-                    os.getenv("QUIZ_LANGFUSE_PUBLIC_KEY")[:10] + "..."
-                    if os.getenv("QUIZ_LANGFUSE_PUBLIC_KEY")
-                    else None
-                ),
-            },
-        }
-    except ImportError:
-        return {"available": False, "error": "Langfuse 모듈이 설치되지 않음"}
-    except Exception as e:
-        return {"available": False, "error": f"Langfuse 연결 확인 실패: {str(e)}"}
