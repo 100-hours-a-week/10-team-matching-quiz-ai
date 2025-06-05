@@ -1,6 +1,4 @@
 import asyncio
-import torch
-import re
 import logging
 from vllm import SamplingParams
 from vllm.engine.arg_utils import AsyncEngineArgs
@@ -8,18 +6,16 @@ from vllm.engine.async_llm_engine import AsyncLLMEngine
 from langfuse import Langfuse
 import os
 import uuid
-from typing import Optional, List
+from typing import Optional
 from huggingface_hub import login
 from openai import OpenAI
-from dotenv import load_dotenv
-
-load_dotenv()
+from app.api.question_generator.question_generator_config import QuestionGeneratorConfig
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-
-HF_TOKEN = os.getenv("HF_TOKEN")
+# 설정 로드
+HF_TOKEN = QuestionGeneratorConfig.get_hf_token()
 if HF_TOKEN:
     try:
         login(token=HF_TOKEN)
@@ -27,25 +23,18 @@ if HF_TOKEN:
     except Exception as e:
         logger.warning(f"Hugging Face Hub 로그인 실패: {e}")
 
-MODEL_PATH = os.getenv("LLM_MODEL_PATH")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
+MODEL_PATH = QuestionGeneratorConfig.get_model_path()
+OPENAI_API_KEY = QuestionGeneratorConfig.get_openai_api_key()
 
-langfuse = Langfuse(
-    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-    host=os.getenv("LANGFUSE_HOST"),
-)
+langfuse_config = QuestionGeneratorConfig.get_langfuse_config()
+langfuse = Langfuse(**langfuse_config) if all(langfuse_config.values()) else None
+openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 llm: Optional[AsyncLLMEngine] = None
 
 
-def str2bool(value: str) -> bool:
-    return value.lower() in ("true", "1", "yes")
-
-
 def initialize_llm():
-    """LLM을 초기화하는 함수 - 처음에 실행할때만 호출"""
+    """LLM을 초기화하는 함수"""
     global llm
     if llm is not None:
         logger.info("AsyncLLMEngine이 이미 초기화되어 있습니다.")
@@ -53,50 +42,28 @@ def initialize_llm():
 
     os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
     try:
-        dtype_env = os.getenv("DTYPE", "auto")
-        tensor_parallel_size_env = int(os.getenv("VLLM_TENSOR_PARALLEL_SIZE", "1"))
-        trust_remote_code_env = str2bool(os.getenv("VLLM_TRUST_REMOTE_CODE", "True"))
-        download_dir_env = os.getenv("VLLM_DOWNLOAD_DIR", "./model_cache")
-        max_model_len_env = int(os.getenv("VLLM_MAX_MODEL_LEN", "2048"))
-        gpu_memory_utilization_env = float(
-            os.getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.9")
-        )
-        max_num_batched_tokens_env = int(
-            os.getenv("VLLM_MAX_NUM_BATCHED_TOKENS", "4096")
-        )
-        max_num_seqs_env = int(os.getenv("VLLM_MAX_NUM_SEQS", "256"))
-        enforce_eager_env = str2bool(os.getenv("VLLM_ENFORCE_EAGER", "False"))
-        quantization_env = os.getenv("VLLM_QUANTIZATION", None)
-        tokenizer_path_env = os.getenv("VLLM_TOKENIZER_PATH", MODEL_PATH)
-        kv_cache_dtype = os.getenv("VLLM_KV_CACHE_DTYPE", "auto")
-
+        vllm_config = QuestionGeneratorConfig.get_vllm_config()
+        
         engine_args = AsyncEngineArgs(
             model=MODEL_PATH,
-            tokenizer=tokenizer_path_env,
-            tensor_parallel_size=tensor_parallel_size_env,
-            trust_remote_code=trust_remote_code_env,
-            dtype=dtype_env,
-            quantization=quantization_env,
-            download_dir=download_dir_env,
-            max_model_len=max_model_len_env,
-            gpu_memory_utilization=gpu_memory_utilization_env,
-            max_num_batched_tokens=max_num_batched_tokens_env,
-            max_num_seqs=max_num_seqs_env,
-            enforce_eager=enforce_eager_env,
+            tokenizer=MODEL_PATH,
+            tensor_parallel_size=vllm_config["tensor_parallel_size"],
+            trust_remote_code=vllm_config["trust_remote_code"],
+            dtype=vllm_config["dtype"],
+            quantization=vllm_config["quantization"],
+            download_dir=vllm_config["download_dir"],
+            max_model_len=vllm_config["max_model_len"],
+            gpu_memory_utilization=vllm_config["gpu_memory_utilization"],
+            max_num_batched_tokens=vllm_config["max_num_batched_tokens"],
+            max_num_seqs=vllm_config["max_num_seqs"],
+            enforce_eager=vllm_config["enforce_eager"],
             enable_chunked_prefill=True,
             disable_log_requests=True,
+            kv_cache_dtype=vllm_config["kv_cache_dtype"],
         )
 
         llm = AsyncLLMEngine.from_engine_args(engine_args)
-
-        logger.info(
-            f"AsyncLLMEngine 모델 로드 성공: {MODEL_PATH}, 다음 파라미터로 초기화: "
-            f"tokenizer_path='{tokenizer_path_env}', dtype={dtype_env}, tensor_parallel_size={tensor_parallel_size_env}, "
-            f"trust_remote_code={trust_remote_code_env}, download_dir='{download_dir_env}', "
-            f"max_model_len={max_model_len_env}, gpu_memory_utilization={gpu_memory_utilization_env}, "
-            f"max_num_batched_tokens={max_num_batched_tokens_env}, max_num_seqs={max_num_seqs_env}, "
-            f"enforce_eager={enforce_eager_env}, quantization={quantization_env}"
-        )
+        logger.info(f"AsyncLLMEngine 모델 로드 성공: {MODEL_PATH}")
         return llm
     except Exception as e:
         logger.error(f"AsyncLLMEngine 모델 로드 실패: {e}")
@@ -141,29 +108,15 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
     generation = None
 
     async def _generate_with_async_engine():
-        temperature_env = float(os.getenv("VLLM_SAMPLING_TEMPERATURE", "0.7"))
-        top_p_env = float(os.getenv("VLLM_SAMPLING_TOP_P", "0.9"))
-        top_k_env = int(os.getenv("VLLM_SAMPLING_TOP_K", "50"))
-        repetition_penalty_env = float(
-            os.getenv("VLLM_SAMPLING_REPETITION_PENALTY", "1.15")
-        )
-        max_tokens_env = int(os.getenv("VLLM_SAMPLING_MAX_TOKENS", "150"))
-        stop_sequences_str = os.getenv(
-            "VLLM_SAMPLING_STOP_SEQUENCES", "질문 5.,질문 6."
-        )
-        stop_sequences_env = (
-            [seq.strip() for seq in stop_sequences_str.split(",") if seq.strip()]
-            if stop_sequences_str
-            else []
-        )
-
+        sampling_config = QuestionGeneratorConfig.get_sampling_config()
+        
         params = SamplingParams(
-            temperature=temperature_env,
-            top_p=top_p_env,
-            top_k=top_k_env,
-            repetition_penalty=repetition_penalty_env,
-            max_tokens=max_tokens_env,
-            stop=stop_sequences_env,
+            temperature=sampling_config["temperature"],
+            top_p=sampling_config["top_p"],
+            top_k=sampling_config["top_k"],
+            repetition_penalty=sampling_config["repetition_penalty"],
+            max_tokens=sampling_config["max_tokens"],
+            stop=sampling_config["stop_sequences"],
         )
 
         results_generator = llm_engine.generate(prompt, params, request_id)
@@ -191,39 +144,36 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
 
     generation = None
     try:
+        sampling_config = QuestionGeneratorConfig.get_sampling_config()
+        
         generation_kwargs = {
             "name": "local-llm",
             "model": MODEL_PATH,
             "input": prompt,
-            "metadata": {
-                "temperature": float(os.getenv("VLLM_SAMPLING_TEMPERATURE", "0.7")),
-                "top_p": float(os.getenv("VLLM_SAMPLING_TOP_P", "0.9")),
-                "top_k": int(os.getenv("VLLM_SAMPLING_TOP_K", "50")),
-                "repetition_penalty": float(
-                    os.getenv("VLLM_SAMPLING_REPETITION_PENALTY", "1.15")
-                ),
-                "max_tokens": int(os.getenv("VLLM_SAMPLING_MAX_TOKENS", "150")),
-            },
+            "metadata": sampling_config,
         }
 
         if trace_id:
             generation_kwargs["trace_id"] = trace_id
 
-        generation = langfuse.generation(**generation_kwargs)
+        if langfuse:
+            generation = langfuse.generation(**generation_kwargs)
 
         start_time = asyncio.get_event_loop().time()
+        api_config = QuestionGeneratorConfig.get_api_config()
         timeout = float(os.getenv("LLM_TIMEOUT", "60.0"))
 
         result = await asyncio.wait_for(_generate_with_async_engine(), timeout=timeout)
         execution_time = asyncio.get_event_loop().time() - start_time
 
-        generation.end(
-            output=result,
-            metadata={
-                "execution_time_seconds": execution_time,
-                **generation_kwargs["metadata"],
-            },
-        )
+        if generation:
+            generation.end(
+                output=result,
+                metadata={
+                    "execution_time_seconds": execution_time,
+                    **generation_kwargs["metadata"],
+                },
+            )
         return result
 
     except (asyncio.TimeoutError, Exception) as e:
@@ -261,7 +211,11 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
     OpenAI API를 사용하여 프롬프트에 대한 응답을 생성합니다.
     주로 부족한 질문을 채우기 위한 백업 메커니즘으로 사용됩니다.
     """
-    model_name = "gpt-4o-mini"
+    if not openai_client:
+        raise RuntimeError("OpenAI API 키가 설정되지 않았습니다.")
+        
+    api_config = QuestionGeneratorConfig.get_api_config()
+    model_name = api_config["openai_model"]
     generation = None  # Langfuse용
 
     try:
@@ -280,7 +234,8 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
         if trace_id:
             generation_kwargs["trace_id"] = trace_id
 
-        generation = langfuse.generation(**generation_kwargs)
+        if langfuse:
+            generation = langfuse.generation(**generation_kwargs)
 
         def _blocking_openai_call():
             return openai_client.chat.completions.create(
@@ -322,19 +277,20 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
             f"OpenAI API ({model_name}) 호출 성공: 입력 토큰 {input_tokens}, 출력 토큰 {output_tokens}, 비용 ${cost:.6f}, 실행 시간 {execution_time:.2f}초"
         )
 
-        generation.end(
-            output=response.choices[0].message.content,
-            usage={
-                "promptTokens": input_tokens,
-                "completionTokens": output_tokens,
-                "totalTokens": input_tokens + output_tokens,
-            },
-            metadata={
-                "cost_usd": cost,
-                "model_name": model_name,
-                "execution_time_seconds": execution_time,
-            },
-        )
+        if generation:
+            generation.end(
+                output=response.choices[0].message.content,
+                usage={
+                    "promptTokens": input_tokens,
+                    "completionTokens": output_tokens,
+                    "totalTokens": input_tokens + output_tokens,
+                },
+                metadata={
+                    "cost_usd": cost,
+                    "model_name": model_name,
+                    "execution_time_seconds": execution_time,
+                },
+            )
         return response.choices[0].message.content
 
     except Exception as e:

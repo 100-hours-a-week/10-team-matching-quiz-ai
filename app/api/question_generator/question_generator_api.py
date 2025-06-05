@@ -8,6 +8,7 @@ from app.api.question_generator.question_generator_model import (
     call_openai_api,
 )
 from app.api.question_generator.question_generator_parser import parse_questions
+from app.api.question_generator.question_generator_config import QuestionGeneratorConfig
 import asyncio
 from langfuse import Langfuse
 import os
@@ -32,14 +33,14 @@ except ImportError:
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-langfuse = Langfuse(
-    secret_key=os.getenv("LANGFUSE_SECRET_KEY"),
-    public_key=os.getenv("LANGFUSE_PUBLIC_KEY"),
-    host=os.getenv("LANGFUSE_HOST"),
-)
+# 설정에서 Langfuse 초기화
+langfuse_config = QuestionGeneratorConfig.get_langfuse_config()
+langfuse = Langfuse(**langfuse_config) if all(langfuse_config.values()) else None
 
-GENERATE_COUNT = 4
-MAX_HISTORY_QUESTIONS = int(os.getenv("MAX_HISTORY_QUESTIONS", 20))
+# 설정에서 API 구성 가져오기
+api_config = QuestionGeneratorConfig.get_api_config()
+GENERATE_COUNT = api_config["generate_count"]
+MAX_HISTORY_QUESTIONS = api_config["max_history_questions"]
 
 _prompt_cache = {}
 
@@ -48,7 +49,11 @@ def get_cached_prompt(prompt_name: str):
     """프롬프트를 캐시에서 가져오거나, 없으면 Langfuse에서 로드하여 캐시에 저장"""
     if prompt_name not in _prompt_cache:
         logger.info(f"프롬프트 캐시 미스: {prompt_name} - Langfuse에서 로드 중...")
-        _prompt_cache[prompt_name] = langfuse.get_prompt(prompt_name)
+        if langfuse:
+            _prompt_cache[prompt_name] = langfuse.get_prompt(prompt_name)
+        else:
+            logger.warning("Langfuse가 설정되지 않아 프롬프트를 캐시할 수 없습니다.")
+            return None
         logger.info(f"프롬프트 캐시 저장 완료: {prompt_name}")
     else:
         logger.debug(f"프롬프트 캐시 히트: {prompt_name}")
@@ -248,21 +253,27 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
     trace_id = f"followup_{req.interview_id}_{uuid.uuid4().hex}"
     request_start_time = time.time()
 
-    trace = langfuse.trace(
-        id=trace_id,
-        name="followup_generation_llm",
-        input={
-            "interview_id": req.interview_id,
-            "selected_question": req.selected_question,
-            "keyword": req.keyword,
-            "passed_questions": req.passed_questions or [],
-        },
-    )
+    trace = None
+    if langfuse:
+        trace = langfuse.trace(
+            id=trace_id,
+            name="followup_generation_llm",
+            input={
+                "interview_id": req.interview_id,
+                "selected_question": req.selected_question,
+                "keyword": req.keyword,
+                "passed_questions": req.passed_questions or [],
+            },
+        )
 
     context = prepare_context(req, trace)
 
     prompt_template = get_cached_prompt("followup_questions_generator")
-    prompt = prompt_template.compile(**context)
+    if prompt_template:
+        prompt = prompt_template.compile(**context)
+    else:
+        # 기본 프롬프트 사용
+        prompt = create_default_followup_prompt(context)
 
     try:
         generated_questions = await generate_primary_questions(prompt, trace)
@@ -314,16 +325,18 @@ async def generate_followup_openai(req: FollowupRequest) -> FollowupResponse:
     trace_id = f"followup_{req.interview_id}{uuid.uuid4().hex}"
     request_start_time = time.time()
 
-    trace = langfuse.trace(
-        id=trace_id,
-        name="followup_generation_api",  # 이름 변경으로 구분
-        input={
-            "interview_id": req.interview_id,
-            "selected_question": req.selected_question,
-            "keyword": req.keyword,
-            "passed_questions": req.passed_questions or [],
-        },
-    )
+    trace = None
+    if langfuse:
+        trace = langfuse.trace(
+            id=trace_id,
+            name="followup_generation_api",  # 이름 변경으로 구분
+            input={
+                "interview_id": req.interview_id,
+                "selected_question": req.selected_question,
+                "keyword": req.keyword,
+                "passed_questions": req.passed_questions or [],
+            },
+        )
 
     try:
         logger.info(
@@ -408,3 +421,23 @@ async def generate_followup_openai(req: FollowupRequest) -> FollowupResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"꼬리 질문 생성 실패: {str(e)}",
         )
+
+
+def create_default_followup_prompt(context: Dict[str, Any]) -> str:
+    """Langfuse가 없을 때 사용할 기본 꼬리질문 프롬프트"""
+    return f"""당신은 IT 기술 면접관입니다. 다음 맥락을 바탕으로 꼬리질문 4개를 생성해주세요.
+
+선택된 질문: {context.get('selected_question', '')}
+키워드: {context.get('keyword', '')}
+이전 질문들: {', '.join(context.get('passed_questions', []))}
+
+요구사항:
+1. 키워드 "{context.get('keyword', '')}"와 관련된 꼬리질문 4개를 생성하세요
+2. 각 질문은 "질문 1.", "질문 2." 형식으로 시작하세요
+3. 이전 질문과 중복되지 않도록 하세요
+4. 기술적 깊이를 가진 구체적인 질문을 만드세요
+
+질문 1. 
+질문 2. 
+질문 3. 
+질문 4. """

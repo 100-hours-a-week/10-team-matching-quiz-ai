@@ -2,10 +2,13 @@ import re
 import unicodedata
 import logging
 from typing import List, Optional
+from app.api.question_generator.question_generator_config import QuestionGeneratorConfig
 
 logger = logging.getLogger(__name__)
 
-MAX_QUESTION_LENGTH = 100  # 허용되는 최대 질문 길이
+# 설정에서 최대 질문 길이 가져오기
+parser_config = QuestionGeneratorConfig.get_parser_config()
+MAX_QUESTION_LENGTH = parser_config["max_question_length"]
 
 # "질문 1. ..." 또는 "Q1. ..." 형식의 질문 문장을 추출하는 정규식
 QUESTION_PATTERN = re.compile(
