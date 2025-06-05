@@ -1,7 +1,3 @@
-# =============================================================================
-# Team Matching Quiz AI - Main Application
-# =============================================================================
-
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.api import router
@@ -12,10 +8,6 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from enum import Enum
 
-# =============================================================================
-# 로깅 설정
-# =============================================================================
-
 logging.basicConfig(
     level=logging.INFO, 
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -25,12 +17,6 @@ logger = logging.getLogger(__name__)
 # 환경 정보 로깅
 logger.info(f"감지된 환경: {ENVIRONMENT}")
 logger.info(f"활성화된 모델들: {ENABLED_MODELS}")
-
-
-# =============================================================================
-# 열거형 정의
-# =============================================================================
-
 
 class ModelType(Enum):
     VLLM = "vllm"
@@ -43,7 +29,6 @@ class ModelStatus(Enum):
     READY = "ready"
     ERROR = "error"
     LAZY_READY = "lazy_ready"
-
 
 class BaseModelWrapper(ABC):
     """모든 모델의 기본 래퍼 클래스"""
