@@ -108,20 +108,31 @@ class VLLMModelWrapper(BaseModelWrapper):
 
             from app.api.question_generator.question_generator_model import (
                 initialize_llm,
+                get_llm_engine,
             )
 
             logger.info(f"{self.model_name} (vLLM) 즉시 초기화를 시도합니다...")
-            global_llm_engine = initialize_llm()
+            initialized_engine = initialize_llm()
 
-            if global_llm_engine:
-                self._model_data = global_llm_engine
-                self.status = ModelStatus.READY
-                logger.info(
-                    f"{self.model_name} 즉시 초기화가 성공적으로 완료되었습니다."
-                )
-                return True
+            if initialized_engine:
+                # 글로벌 엔진 상태 확인
+                current_engine = get_llm_engine()
+                if current_engine is not None:
+                    self._model_data = current_engine
+                    self.status = ModelStatus.READY
+                    logger.info(
+                        f"{self.model_name} 즉시 초기화가 성공적으로 완료되었습니다."
+                    )
+                    return True
+                else:
+                    self._error_message = (
+                        "초기화 후 글로벌 LLM 엔진을 찾을 수 없습니다."
+                    )
+                    self.status = ModelStatus.ERROR
+                    logger.error(f"{self.model_name}: {self._error_message}")
+                    return False
             else:
-                self._error_message = "초기화 후 global_llm_engine이 None입니다."
+                self._error_message = "initialize_llm이 None을 반환했습니다."
                 self.status = ModelStatus.ERROR
                 logger.error(f"{self.model_name}: {self._error_message}")
                 return False

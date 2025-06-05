@@ -48,6 +48,7 @@ def initialize_llm():
     """LLM을 초기화하는 함수 - 처음에 실행할때만 호출"""
     global llm
     if llm is not None:
+        logger.info("AsyncLLMEngine이 이미 초기화되어 있습니다.")
         return llm
 
     os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
@@ -102,6 +103,12 @@ def initialize_llm():
         raise
 
 
+def get_llm_engine():
+    """현재 글로벌 LLM 엔진 반환"""
+    global llm
+    return llm
+
+
 async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None) -> str:
     """
     LLM에 프롬프트를 안전하게 전송하고 생성된 응답을 반환합니다.
@@ -117,10 +124,9 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
     Raises:
         Exception: LLM 호출 과정에서 발생한 예외 (fallback이 false이거나 fallback도 실패한 경우)
     """
-    from app.main import get_model
-
-    # 모델 관리자를 통해 모델 가져오기
-    llm_engine = get_model("question_generator")
+    # 글로벌 LLM 엔진 직접 사용
+    global llm
+    llm_engine = llm
 
     if llm_engine is None:
         logger.error("LLM이 초기화되지 않았습니다.")
@@ -291,7 +297,10 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
                 top_p=0.95,
             )
 
+        # 시간 추적 시작
+        start_time = asyncio.get_event_loop().time()
         response = await asyncio.to_thread(_blocking_openai_call)
+        execution_time = asyncio.get_event_loop().time() - start_time
 
         input_tokens = response.usage.prompt_tokens
         output_tokens = response.usage.completion_tokens
@@ -310,7 +319,7 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
         )
 
         logger.info(
-            f"OpenAI API ({model_name}) 호출 성공: 입력 토큰 {input_tokens}, 출력 토큰 {output_tokens}, 비용 ${cost:.6f}"
+            f"OpenAI API ({model_name}) 호출 성공: 입력 토큰 {input_tokens}, 출력 토큰 {output_tokens}, 비용 ${cost:.6f}, 실행 시간 {execution_time:.2f}초"
         )
 
         generation.end(
@@ -323,6 +332,7 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
             metadata={
                 "cost_usd": cost,
                 "model_name": model_name,
+                "execution_time_seconds": execution_time,
             },
         )
         return response.choices[0].message.content

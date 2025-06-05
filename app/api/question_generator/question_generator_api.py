@@ -13,6 +13,7 @@ from langfuse import Langfuse
 import os
 import logging
 import uuid
+import time
 from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 
@@ -80,13 +81,16 @@ def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
 
     retrieved_section = ""
     rag_span = trace.span(name="rag_retrieval")
+    rag_start_time = time.time()
 
     if VECTOR_DB_AVAILABLE and rag_retriever:
         try:
             rag_results = rag_retriever(req.selected_question, req.keyword or "")
+            rag_execution_time = time.time() - rag_start_time
             rag_span.update(
                 input={"query": req.selected_question, "keyword": req.keyword or ""},
                 output={"results": rag_results},
+                metadata={"execution_time_seconds": rag_execution_time},
             )
             retrieved_questions = [r["question"] for r in rag_results["results"]]
             if retrieved_questions:
@@ -94,13 +98,19 @@ def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
                 retrieved_section = f"\n\n[유사한 기존 질문]\n{joined_rag}"
             rag_span.end()
         except Exception as e:
+            rag_execution_time = time.time() - rag_start_time
             logging.warning(f"RAG 검색 실패: {e}")
-            rag_span.end(error=str(e))
+            rag_span.end(
+                error=str(e), metadata={"execution_time_seconds": rag_execution_time}
+            )
             retrieved_section = ""  # fallback
     else:
+        rag_execution_time = time.time() - rag_start_time
         logging.info("Vector DB 모듈이 없어 RAG 검색을 건너뜁니다.")
         rag_span.update(
-            input={"status": "skipped"}, output={"reason": "Vector DB 모듈이 없음"}
+            input={"status": "skipped"},
+            output={"reason": "Vector DB 모듈이 없음"},
+            metadata={"execution_time_seconds": rag_execution_time},
         )
         rag_span.end()
 
@@ -116,23 +126,36 @@ def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
 async def generate_primary_questions(prompt: str, trace) -> List[str]:
     """주 질문 생성 로직"""
     llm_span = trace.span(name="llm_call")
+    llm_start_time = time.time()
 
     try:
         raw_response = await call_llm(prompt, trace_id=trace.id)
-        llm_span.update(input={"prompt": prompt}, output={"raw_response": raw_response})
+        llm_execution_time = time.time() - llm_start_time
+        llm_span.update(
+            input={"prompt": prompt},
+            output={"raw_response": raw_response},
+            metadata={"execution_time_seconds": llm_execution_time},
+        )
         llm_span.end()
 
         parsing_span = trace.span(name="response_parsing")
+        parsing_start_time = time.time()
         questions = parse_questions(raw_response)[:GENERATE_COUNT]
+        parsing_execution_time = time.time() - parsing_start_time
         parsing_span.update(
-            input={"raw_response": raw_response}, output={"parsed_questions": questions}
+            input={"raw_response": raw_response},
+            output={"parsed_questions": questions},
+            metadata={"execution_time_seconds": parsing_execution_time},
         )
         parsing_span.end()
 
         return questions
     except Exception as e:
+        llm_execution_time = time.time() - llm_start_time
         if not llm_span.ended:
-            llm_span.end(error=str(e))
+            llm_span.end(
+                error=str(e), metadata={"execution_time_seconds": llm_execution_time}
+            )
         raise
 
 
@@ -159,20 +182,26 @@ async def generate_additional_questions(
     prompt_api = prompt_template_api.compile(**context_api)
 
     llm_span_api = trace.span(name="open-api-call")
+    llm_api_start_time = time.time()
 
     try:
         raw_response_api = await call_openai_api(prompt_api, trace_id=trace.id)
+        llm_api_execution_time = time.time() - llm_api_start_time
         llm_span_api.update(
             input={"prompt_api": prompt_api},
             output={"raw_response_api": raw_response_api},
+            metadata={"execution_time_seconds": llm_api_execution_time},
         )
         llm_span_api.end()
 
         parsing_span_api = trace.span(name="response_parsing_additional")
+        parsing_api_start_time = time.time()
         additional_questions = parse_questions(raw_response_api)
+        parsing_api_execution_time = time.time() - parsing_api_start_time
         parsing_span_api.update(
             input={"raw_response_api": raw_response_api},
             output={"parsed_questions": additional_questions},
+            metadata={"execution_time_seconds": parsing_api_execution_time},
         )
         parsing_span_api.end()
 
@@ -189,11 +218,15 @@ async def generate_additional_questions(
 
         return result[:GENERATE_COUNT]
     except Exception as e:
+        llm_api_execution_time = time.time() - llm_api_start_time
         logger.error(
             f"OpenAI API 추가 질문 생성 실패: interview_id={req.interview_id}, error={str(e)}"
         )
         if not llm_span_api.ended:
-            llm_span_api.end(error=str(e))
+            llm_span_api.end(
+                error=str(e),
+                metadata={"execution_time_seconds": llm_api_execution_time},
+            )
         raise
 
 
@@ -213,6 +246,7 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
     validate_request(req)
 
     trace_id = f"followup_{req.interview_id}_{uuid.uuid4().hex}"
+    request_start_time = time.time()
 
     trace = langfuse.trace(
         id=trace_id,
@@ -242,9 +276,13 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
                 generated_questions,
             )
 
-        trace.update(output={"followup_questions": generated_questions})
+        request_execution_time = time.time() - request_start_time
+        trace.update(
+            output={"followup_questions": generated_questions},
+            metadata={"total_execution_time_seconds": request_execution_time},
+        )
         logger.info(
-            f"응답 반환: interview_id={req.interview_id}, questions_count={len(generated_questions)}"
+            f"응답 반환: interview_id={req.interview_id}, questions_count={len(generated_questions)}, execution_time={request_execution_time:.2f}초"
         )
 
         return FollowupResponse(
@@ -254,7 +292,11 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
         )
 
     except Exception as e:
-        trace.update(error={"message": str(e)})
+        request_execution_time = time.time() - request_start_time
+        trace.update(
+            error={"message": str(e)},
+            metadata={"total_execution_time_seconds": request_execution_time},
+        )
         logger.error(f"꼬리 질문 생성 실패: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -263,13 +305,14 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
 
 
 @router.post("/open-api-server", response_model=FollowupResponse)
-async def generate_followup(req: FollowupRequest) -> FollowupResponse:
+async def generate_followup_openai(req: FollowupRequest) -> FollowupResponse:
     # Check OpenAI API availability (this endpoint doesn't require local models)
     logger.info(f"요청 받음: interview_id={req.interview_id}, req_data={req.dict()}")
 
     validate_request(req)
 
     trace_id = f"followup_{req.interview_id}{uuid.uuid4().hex}"
+    request_start_time = time.time()
 
     trace = langfuse.trace(
         id=trace_id,
@@ -300,20 +343,26 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
         prompt_api = prompt_template_api.compile(**context_api)
 
         llm_span_api = trace.span(name="openai_api_call")
+        llm_api_start_time = time.time()
 
         try:
             raw_response_api = await call_openai_api(prompt_api, trace_id=trace.id)
+            llm_api_execution_time = time.time() - llm_api_start_time
             llm_span_api.update(
                 input={"prompt_api": prompt_api},
                 output={"raw_response_api": raw_response_api},
+                metadata={"execution_time_seconds": llm_api_execution_time},
             )
             llm_span_api.end()
 
             parsing_span_api = trace.span(name="response_parsing_api")
+            parsing_api_start_time = time.time()
             generated_questions = parse_questions(raw_response_api)[:GENERATE_COUNT]
+            parsing_api_execution_time = time.time() - parsing_api_start_time
             parsing_span_api.update(
                 input={"raw_response_api": raw_response_api},
                 output={"parsed_questions": generated_questions},
+                metadata={"execution_time_seconds": parsing_api_execution_time},
             )
             parsing_span_api.end()
 
@@ -322,16 +371,24 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
             )
 
         except Exception as e:
+            llm_api_execution_time = time.time() - llm_api_start_time
             logger.error(
                 f"OpenAI API 질문 생성 실패: interview_id={req.interview_id}, error={str(e)}"
             )
             if not llm_span_api.ended:
-                llm_span_api.end(error=str(e))
+                llm_span_api.end(
+                    error=str(e),
+                    metadata={"execution_time_seconds": llm_api_execution_time},
+                )
             raise
 
-        trace.update(output={"followup_questions": generated_questions})
+        request_execution_time = time.time() - request_start_time
+        trace.update(
+            output={"followup_questions": generated_questions},
+            metadata={"total_execution_time_seconds": request_execution_time},
+        )
         logger.info(
-            f"응답 반환: interview_id={req.interview_id}, questions_count={len(generated_questions)}"
+            f"응답 반환: interview_id={req.interview_id}, questions_count={len(generated_questions)}, execution_time={request_execution_time:.2f}초"
         )
 
         return FollowupResponse(
@@ -341,7 +398,11 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
         )
 
     except Exception as e:
-        trace.update(error={"message": str(e)})
+        request_execution_time = time.time() - request_start_time
+        trace.update(
+            error={"message": str(e)},
+            metadata={"total_execution_time_seconds": request_execution_time},
+        )
         logger.error(f"꼬리 질문 생성 실패: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
