@@ -43,7 +43,7 @@ VLLM_CONFIG = {
 # Transformers 설정
 TRANSFORMERS_CONFIG = {
     "model_name": os.getenv(
-        "QUIZ_MODEL_NAME", "TommyKong/gemma-3-finetune-4bit"
+        "QUIZ_MODEL_NAME", "unsloth/Qwen3-8B-unsloth-bnb-4bit"
     ),
     "hf_token": os.getenv("QUIZ_HF_TOKEN"),
     "device_map": "auto",

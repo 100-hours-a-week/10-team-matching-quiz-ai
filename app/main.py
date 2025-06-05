@@ -1,3 +1,7 @@
+# =============================================================================
+# Team Matching Quiz AI - Main Application
+# =============================================================================
+
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.api import router
@@ -8,13 +12,24 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from enum import Enum
 
+# =============================================================================
+# 로깅 설정
+# =============================================================================
+
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO, 
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
 
+# 환경 정보 로깅
 logger.info(f"감지된 환경: {ENVIRONMENT}")
 logger.info(f"활성화된 모델들: {ENABLED_MODELS}")
+
+
+# =============================================================================
+# 열거형 정의
+# =============================================================================
 
 
 class ModelType(Enum):
@@ -170,19 +185,23 @@ class ModelManager:
 
     def __init__(self):
         self._models: Dict[str, BaseModelWrapper] = {}
+        # 모델 래퍼 초기화
         self._models["question_generator"] = VLLMModelWrapper("question_generator")
         self._models["quiz_generator"] = LazyTransformersModelWrapper("quiz_generator")
 
     def initialize_immediate_models(self) -> bool:
         """즉시 로딩 모델들만 초기화 (vLLM)"""
-        success = False
+        success = True
         
+        # question_generator (vLLM) - 즉시 초기화
         if "question_generator" in ENABLED_MODELS:
-            success = self._models["question_generator"].initialize()
+            if not self._models["question_generator"].initialize():
+                logger.error("question_generator 초기화 실패")
+                success = False
 
-        # quiz_generator는 지연 로딩이므로 즉시 초기화하지 않음
+        # quiz_generator (Transformers) - 지연 로딩이므로 초기화 표시만
         if "quiz_generator" in ENABLED_MODELS:
-            success = True
+            logger.info("quiz_generator는 지연 로딩으로 설정됨")
 
         return success
 
@@ -222,52 +241,99 @@ model_manager = ModelManager()
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """애플리케이션 라이프사이클 관리"""
+    # 시작 로직
     logger.info(f"애플리케이션 시작 (환경: {ENVIRONMENT})")
-
+    
     # 즉시 로딩 모델들 초기화
+    logger.info("모델 초기화 시작...")
     initialization_success = model_manager.initialize_immediate_models()
 
-    if not initialization_success:
-        logger.warning("모델 초기화 실패")
+    if initialization_success:
+        logger.info("모델 초기화 성공")
+    else:
+        logger.warning("일부 모델 초기화 실패")
 
-    logger.info(f"사용 가능한 모델들: {model_manager.get_available_models()}")
+    available_models = model_manager.get_available_models()
+    logger.info(f"사용 가능한 모델들: {available_models}")
 
+    # 애플리케이션 실행
     yield
 
-    # 정리
-    logger.info("애플리케이션 종료: 리소스 정리...")
+    # 종료 로직
+    logger.info("애플리케이션 종료: 리소스 정리 중...")
     model_manager.cleanup_all_models()
+    logger.info("리소스 정리 완료")
 
 
+# FastAPI 애플리케이션 생성
 app = FastAPI(
     title="Team Matching Quiz AI",
-    description=f"Environment: {ENVIRONMENT}, Models: {ENABLED_MODELS}",
+    description=f"AI 기반 팀 매칭 퀴즈 시스템\n환경: {ENVIRONMENT}\n활성화된 모델: {', '.join(ENABLED_MODELS)}",
+    version="1.0.0",
     lifespan=lifespan,
 )
+
+# 라우터 등록
 app.include_router(router)
 
 
+# =============================================================================
 # 유틸리티 함수들
+# =============================================================================
+
 def get_model(model_name: str):
-    """특정 모델 반환"""
+    """
+    특정 모델 반환
+    
+    Args:
+        model_name (str): 모델 이름 ('question_generator' 또는 'quiz_generator')
+        
+    Returns:
+        모델 객체 또는 None
+    """
     return model_manager.get_model(model_name)
 
 
 def is_model_available(model_name: str) -> bool:
-    """모델 사용 가능 여부 확인"""
+    """
+    모델 사용 가능 여부 확인
+    
+    Args:
+        model_name (str): 모델 이름
+        
+    Returns:
+        bool: 모델 사용 가능 여부
+    """
     return model_manager.is_model_available(model_name)
 
 
 def get_available_models():
-    """사용 가능한 모델 목록 반환"""
+    """
+    사용 가능한 모델 목록 반환
+    
+    Returns:
+        list: 사용 가능한 모델 이름 목록
+    """
     return model_manager.get_available_models()
 
 
 @app.get("/health")
 async def health_check():
+    """시스템 상태 확인"""
+    available_models = get_available_models()
+    
     return {
         "status": "healthy",
+        "timestamp": "2025-06-05",
         "environment": ENVIRONMENT,
         "enabled_models": ENABLED_MODELS,
-        "available_models": get_available_models(),
+        "available_models": available_models,
+        "models_status": {
+            model: is_model_available(model) for model in ["question_generator", "quiz_generator"]
+        },
+        "system_info": {
+            "total_enabled": len(ENABLED_MODELS),
+            "total_available": len(available_models),
+        }
     }
