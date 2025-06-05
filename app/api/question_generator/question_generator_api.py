@@ -18,6 +18,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# Model availability check import
+from app.main import is_model_available
+
 try:
     from app.vector_db.retriever import rag_retriever
 
@@ -199,6 +202,13 @@ async def generate_additional_questions(
 
 @router.post("/followup-questions", response_model=FollowupResponse)
 async def generate_followup(req: FollowupRequest) -> FollowupResponse:
+    # Check model availability
+    if not is_model_available("question_generator"):
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="질문 생성 모델이 현재 사용할 수 없습니다. 모델이 초기화되지 않았거나 오류가 발생했습니다.",
+        )
+
     logger.info(f"요청 받음: interview_id={req.interview_id}, req_data={req.dict()}")
 
     validate_request(req)
@@ -255,6 +265,7 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
 
 @router.post("/open-api-server", response_model=FollowupResponse)
 async def generate_followup(req: FollowupRequest) -> FollowupResponse:
+    # Check OpenAI API availability (this endpoint doesn't require local models)
     logger.info(f"요청 받음: interview_id={req.interview_id}, req_data={req.dict()}")
 
     validate_request(req)

@@ -117,8 +117,12 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
     Raises:
         Exception: LLM 호출 과정에서 발생한 예외 (fallback이 false이거나 fallback도 실패한 경우)
     """
-    global llm
-    if llm is None:
+    from app.main import get_model
+
+    # 모델 관리자를 통해 모델 가져오기
+    llm_engine = get_model("question_generator")
+
+    if llm_engine is None:
         logger.error("LLM이 초기화되지 않았습니다.")
         if try_fallback and OPENAI_API_KEY:
             logger.info("LLM이 초기화되지 않아 OpenAI API로 대체합니다.")
@@ -156,7 +160,7 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
             stop=stop_sequences_env,
         )
 
-        results_generator = llm.generate(prompt, params, request_id)
+        results_generator = llm_engine.generate(prompt, params, request_id)
 
         final_output_text = ""
         try:
@@ -175,8 +179,8 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
             return final_output_text
         except Exception as e:
             logger.error(f"요청 {request_id}에 대한 AsyncLLMEngine 생성 오류: {e}")
-            if llm:
-                asyncio.create_task(llm.abort(request_id))
+            if llm_engine:
+                asyncio.create_task(llm_engine.abort(request_id))
             raise
 
     generation = None
@@ -226,7 +230,7 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
 
         logger.error(error_message)
 
-        asyncio.create_task(llm.abort(request_id))
+        asyncio.create_task(llm_engine.abort(request_id))
 
         if generation:  # generation 객체가 존재하는지 확인
             generation.end(

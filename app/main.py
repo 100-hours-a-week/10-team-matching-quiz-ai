@@ -4,6 +4,7 @@ from app.api import router
 from app.config.model_config import ModelConfig
 import logging
 import os
+import multiprocessing
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, Union
 from enum import Enum

@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from app.api.quiz_generator.quiz_generator_schema import (
     FollowupRequest,
     FollowupResponse,
@@ -17,8 +17,11 @@ from app.api.quiz_generator.quiz_generator_config import (
 )
 from langfuse import Langfuse
 from app.vector_db.retriever import quiz_rag_retriever
+from app.main import is_model_available
+import logging
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Langfuse 클라이언트 초기화
 langfuse = Langfuse(
@@ -30,7 +33,15 @@ langfuse = Langfuse(
 
 @router.post("/generate_quiz", response_model=FollowupResponse)
 def generate_quiz_api(req: FollowupRequest):
-    print(" 요청 수신: /generate_quiz")
+    logger.info("퀴즈 생성 요청 수신: /generate_quiz")
+
+    # 모델 사용 가능 여부 체크
+    if not is_model_available("quiz_generator"):
+        logger.error("quiz_generator 모델이 사용 불가능합니다.")
+        raise HTTPException(
+            status_code=503,
+            detail="퀴즈 생성 모델이 현재 사용할 수 없습니다. 잠시 후 다시 시도해주세요.",
+        )
 
     try:
         trace = langfuse.trace(
