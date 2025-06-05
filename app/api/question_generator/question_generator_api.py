@@ -18,9 +18,6 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Model availability check import
-from app.main import is_model_available
-
 try:
     from app.vector_db.retriever import rag_retriever
 
@@ -202,7 +199,9 @@ async def generate_additional_questions(
 
 @router.post("/followup-questions", response_model=FollowupResponse)
 async def generate_followup(req: FollowupRequest) -> FollowupResponse:
-    # Check model availability
+    # Check model availability (import inside function to avoid circular import)
+    from app.main import is_model_available
+
     if not is_model_available("question_generator"):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

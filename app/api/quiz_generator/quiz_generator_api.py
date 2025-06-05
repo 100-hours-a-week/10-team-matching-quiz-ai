@@ -17,7 +17,6 @@ from app.api.quiz_generator.quiz_generator_config import (
 )
 from langfuse import Langfuse
 from app.vector_db.retriever import quiz_rag_retriever
-from app.main import is_model_available
 import logging
 
 router = APIRouter()
@@ -35,7 +34,9 @@ langfuse = Langfuse(
 def generate_quiz_api(req: FollowupRequest):
     logger.info("퀴즈 생성 요청 수신: /generate_quiz")
 
-    # 모델 사용 가능 여부 체크
+    # 모델 사용 가능 여부 체크 (import inside function to avoid circular import)
+    from app.main import is_model_available
+
     if not is_model_available("quiz_generator"):
         logger.error("quiz_generator 모델이 사용 불가능합니다.")
         raise HTTPException(
