@@ -107,7 +107,6 @@ def generate_quiz(prompt: str, max_tokens: int = 3000) -> str:
             top_p=0.9,
             repetition_penalty=1.05,
             pad_token_id=tokenizer.eos_token_id,
-            do_sample=True,
         )
 
         # 디코딩
