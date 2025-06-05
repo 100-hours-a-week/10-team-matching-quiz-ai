@@ -1,4 +1,7 @@
 from fastapi import APIRouter, HTTPException, status
+import asyncio
+import logging
+import time
 from app.api.question_generator.question_generator_schema import (
     FollowupRequest,
     FollowupResponse,
@@ -8,8 +11,10 @@ from app.api.question_generator.question_generator_model import (
     call_openai_api,
 )
 from app.api.question_generator.question_generator_parser import parse_questions
-from app.api.question_generator.question_generator_config import QuestionGeneratorConfig
-import asyncio
+from app.api.question_generator.question_generator_config import (
+    LANGFUSE_CONFIG,
+    API_CONFIG,
+)
 from langfuse import Langfuse
 import os
 import logging
@@ -34,13 +39,11 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 # 설정에서 Langfuse 초기화
-langfuse_config = QuestionGeneratorConfig.get_langfuse_config()
-langfuse = Langfuse(**langfuse_config) if all(langfuse_config.values()) else None
+langfuse = Langfuse(**LANGFUSE_CONFIG) if all(LANGFUSE_CONFIG.values()) else None
 
 # 설정에서 API 구성 가져오기
-api_config = QuestionGeneratorConfig.get_api_config()
-GENERATE_COUNT = api_config["generate_count"]
-MAX_HISTORY_QUESTIONS = api_config["max_history_questions"]
+GENERATE_COUNT = API_CONFIG["generate_count"]
+MAX_HISTORY_QUESTIONS = API_CONFIG["max_history_questions"]
 
 _prompt_cache = {}
 

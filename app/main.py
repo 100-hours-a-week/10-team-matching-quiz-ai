@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.api import router
-from app.config.model_config import ModelConfig
+from app.config.model_config import ENVIRONMENT, ENABLED_MODELS
 import logging
 import os
 from abc import ABC, abstractmethod
@@ -12,10 +12,6 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger(__name__)
-
-# 환경 설정
-ENVIRONMENT = ModelConfig.get_environment()
-ENABLED_MODELS = ModelConfig.get_enabled_models()
 
 logger.info(f"감지된 환경: {ENVIRONMENT}")
 logger.info(f"활성화된 모델들: {ENABLED_MODELS}")

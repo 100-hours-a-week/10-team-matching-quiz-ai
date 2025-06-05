@@ -1,21 +1,29 @@
 import asyncio
 import logging
+import os
+import time
+import uuid
 from vllm import SamplingParams
 from vllm.engine.arg_utils import AsyncEngineArgs
 from vllm.engine.async_llm_engine import AsyncLLMEngine
 from langfuse import Langfuse
-import os
-import uuid
 from typing import Optional
 from huggingface_hub import login
 from openai import OpenAI
-from app.api.question_generator.question_generator_config import QuestionGeneratorConfig
+from app.api.question_generator.question_generator_config import (
+    HF_TOKEN,
+    MODEL_PATH,
+    OPENAI_API_KEY,
+    LANGFUSE_CONFIG,
+    VLLM_CONFIG,
+    SAMPLING_CONFIG,
+    API_CONFIG,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # 설정 로드
-HF_TOKEN = QuestionGeneratorConfig.get_hf_token()
 if HF_TOKEN:
     try:
         login(token=HF_TOKEN)
@@ -23,11 +31,7 @@ if HF_TOKEN:
     except Exception as e:
         logger.warning(f"Hugging Face Hub 로그인 실패: {e}")
 
-MODEL_PATH = QuestionGeneratorConfig.get_model_path()
-OPENAI_API_KEY = QuestionGeneratorConfig.get_openai_api_key()
-
-langfuse_config = QuestionGeneratorConfig.get_langfuse_config()
-langfuse = Langfuse(**langfuse_config) if all(langfuse_config.values()) else None
+langfuse = Langfuse(**LANGFUSE_CONFIG) if all(LANGFUSE_CONFIG.values()) else None
 openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
 llm: Optional[AsyncLLMEngine] = None
@@ -42,24 +46,22 @@ def initialize_llm():
 
     os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
     try:
-        vllm_config = QuestionGeneratorConfig.get_vllm_config()
-        
         engine_args = AsyncEngineArgs(
             model=MODEL_PATH,
             tokenizer=MODEL_PATH,
-            tensor_parallel_size=vllm_config["tensor_parallel_size"],
-            trust_remote_code=vllm_config["trust_remote_code"],
-            dtype=vllm_config["dtype"],
-            quantization=vllm_config["quantization"],
-            download_dir=vllm_config["download_dir"],
-            max_model_len=vllm_config["max_model_len"],
-            gpu_memory_utilization=vllm_config["gpu_memory_utilization"],
-            max_num_batched_tokens=vllm_config["max_num_batched_tokens"],
-            max_num_seqs=vllm_config["max_num_seqs"],
-            enforce_eager=vllm_config["enforce_eager"],
+            tensor_parallel_size=VLLM_CONFIG["tensor_parallel_size"],
+            trust_remote_code=VLLM_CONFIG["trust_remote_code"],
+            dtype=VLLM_CONFIG["dtype"],
+            quantization=VLLM_CONFIG["quantization"],
+            download_dir=VLLM_CONFIG["download_dir"],
+            max_model_len=VLLM_CONFIG["max_model_len"],
+            gpu_memory_utilization=VLLM_CONFIG["gpu_memory_utilization"],
+            max_num_batched_tokens=VLLM_CONFIG["max_num_batched_tokens"],
+            max_num_seqs=VLLM_CONFIG["max_num_seqs"],
+            enforce_eager=VLLM_CONFIG["enforce_eager"],
             enable_chunked_prefill=True,
             disable_log_requests=True,
-            kv_cache_dtype=vllm_config["kv_cache_dtype"],
+            kv_cache_dtype=VLLM_CONFIG["kv_cache_dtype"],
         )
 
         llm = AsyncLLMEngine.from_engine_args(engine_args)
@@ -108,15 +110,13 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
     generation = None
 
     async def _generate_with_async_engine():
-        sampling_config = QuestionGeneratorConfig.get_sampling_config()
-        
         params = SamplingParams(
-            temperature=sampling_config["temperature"],
-            top_p=sampling_config["top_p"],
-            top_k=sampling_config["top_k"],
-            repetition_penalty=sampling_config["repetition_penalty"],
-            max_tokens=sampling_config["max_tokens"],
-            stop=sampling_config["stop_sequences"],
+            temperature=SAMPLING_CONFIG["temperature"],
+            top_p=SAMPLING_CONFIG["top_p"],
+            top_k=SAMPLING_CONFIG["top_k"],
+            repetition_penalty=SAMPLING_CONFIG["repetition_penalty"],
+            max_tokens=SAMPLING_CONFIG["max_tokens"],
+            stop=SAMPLING_CONFIG["stop_sequences"],
         )
 
         results_generator = llm_engine.generate(prompt, params, request_id)
@@ -144,13 +144,11 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
 
     generation = None
     try:
-        sampling_config = QuestionGeneratorConfig.get_sampling_config()
-        
         generation_kwargs = {
             "name": "local-llm",
             "model": MODEL_PATH,
             "input": prompt,
-            "metadata": sampling_config,
+            "metadata": SAMPLING_CONFIG,
         }
 
         if trace_id:
@@ -160,7 +158,6 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
             generation = langfuse.generation(**generation_kwargs)
 
         start_time = asyncio.get_event_loop().time()
-        api_config = QuestionGeneratorConfig.get_api_config()
         timeout = float(os.getenv("LLM_TIMEOUT", "60.0"))
 
         result = await asyncio.wait_for(_generate_with_async_engine(), timeout=timeout)
@@ -212,10 +209,8 @@ async def call_openai_api(prompt: str, trace_id: str = None) -> str:
     주로 부족한 질문을 채우기 위한 백업 메커니즘으로 사용됩니다.
     """
     if not openai_client:
-        raise RuntimeError("OpenAI API 키가 설정되지 않았습니다.")
-        
-    api_config = QuestionGeneratorConfig.get_api_config()
-    model_name = api_config["openai_model"]
+        raise RuntimeError("OpenAI API 키가 설정되지 않았습니다.")        
+    model_name = API_CONFIG["openai_model"]
     generation = None  # Langfuse용
 
     try:
