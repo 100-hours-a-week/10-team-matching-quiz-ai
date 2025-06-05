@@ -106,13 +106,10 @@ class VLLMModelWrapper(BaseModelWrapper):
                 os.environ["VLLM_GPU_MEMORY_UTILIZATION"] = "0.7"
                 os.environ["VLLM_MAX_MODEL_LEN"] = "2048"
 
-            from app.api.question_generator.question_generator_model import (
-                initialize_llm,
-                llm as global_llm_engine,
-            )
+            from app.api.question_generator.question_generator_model import initialize_llm
 
             logger.info(f"{self.model_name} (vLLM) 즉시 초기화를 시도합니다...")
-            initialize_llm()
+            global_llm_engine = initialize_llm()
 
             if global_llm_engine:
                 self._model_data = global_llm_engine
