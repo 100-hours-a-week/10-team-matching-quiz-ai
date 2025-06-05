@@ -31,9 +31,9 @@ langfuse = Langfuse(
 )
 
 
-@router.post("/generate_quiz", response_model=FollowupResponse)
+@router.post("/generate-quiz", response_model=FollowupResponse)
 def generate_quiz_api(req: FollowupRequest):
-    logger.info("퀴즈 생성 요청 수신: /generate_quiz")
+    logger.info("퀴즈 생성 요청 수신: /generate-quiz")
     request_start_time = time.time()
 
     # 모델 사용 가능 여부 체크 (import inside function to avoid circular import)
@@ -51,7 +51,7 @@ def generate_quiz_api(req: FollowupRequest):
             name="quiz_generation",
             tags=["quiz", "generate"],
             input={"question_list": req.question_history_list},
-            metadata={"endpoint": "/generate_quiz"},
+            metadata={"endpoint": "/generate-quiz"},
         )
     except Exception as e:
         print(f"[WARN] Langfuse trace 시작 실패: {e}")
