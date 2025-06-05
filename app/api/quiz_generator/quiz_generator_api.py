@@ -7,6 +7,7 @@ from app.api.quiz_generator.quiz_generator_schema import (
 from app.api.quiz_generator.quiz_generator_parser import (
     parse_response,
     filter_and_select_quizzes,
+    remove_prompt_content,
 )
 from app.api.quiz_generator.quiz_generator_model import generate_quiz
 from app.api.quiz_generator.quiz_generator_config import (
@@ -33,7 +34,6 @@ def generate_quiz_api(req: FollowupRequest):
 
     try:
         trace = langfuse.trace(
-            id=req.interview_id,
             name="quiz_generation",
             tags=["quiz", "generate"],
             input={"question_list": req.question_history_list},
@@ -81,13 +81,18 @@ def generate_quiz_api(req: FollowupRequest):
         prompt = prompt.replace("{{related_questions}}", related_questions_text)
 
     prompt += (
-        "\n\n- 출력은 반드시 다음 형식을 따를 것:\n"
-        "난이도: 하|중|상\n"
-        "문제: (문장)\n"
-        "선지: [..., ..., ..., ...]\n"
-        "정답 인덱스: (1~4)\n"
-        "해설: (문장)\n\n"
-        "- 위 형식 그대로 15~20문제를 연속 출력하시오. 설명은 포함하지 말고 문제만 출력하시오."
+        "\n\n출력 지침:\n"
+        "- 출력은 반드시 15~20개의 4지선다형 문제로 구성되어야 합니다.\n"
+        "- 각 문제는 아래와 같은 형식을 따릅니다:\n"
+        "  난이도: 하 | 중 | 상\n"
+        "  문제: (자연어 문장)\n"
+        "  선지: [보기1, 보기2, 보기3, 보기4]  # JSON 배열 형태\n"
+        "  정답 인덱스: 1~4 사이의 숫자\n"
+        "  해설: 정답의 이유나 부가 설명\n"
+        "- 출력에는 위 문제 형식만 포함하고, 지시사항이나 설명 문구는 포함하지 마세요.\n"
+        "- JSON 포맷은 사용하지 않고, 자유 포맷의 텍스트로 출력하세요.\n"
+        "- 각 문제는 줄바꿈을 포함해 구분되도록 출력할 것.\n"
+        "--- END OF INSTRUCTION ---"
     )
 
     # prompt 생성 span
@@ -101,6 +106,13 @@ def generate_quiz_api(req: FollowupRequest):
     raw_output = generate_quiz(prompt)
     print("quiz 생성 완료")
 
+    # 프롬프트 내용 제거
+    cleaned_output = remove_prompt_content(raw_output)
+
+    # 디버깅 출력 추가
+    print("[CLEANED OUTPUT PREVIEW]")
+    print(cleaned_output[:200])
+
     # LLM 응답 처리 span
     if trace:
         span_llm = trace.span(name="llm_response")
@@ -113,10 +125,12 @@ def generate_quiz_api(req: FollowupRequest):
     else:
         parsed_llm = None
 
-    parsed_list = parse_response(raw_output)
+    parsed_list = parse_response(cleaned_output)
     if not parsed_list:
         if trace:
-            trace.span(name="parsing_error", input=raw_output).update(status="error")
+            trace.span(name="parsing_error", input=cleaned_output).update(
+                status="error"
+            )
         raise ValueError("형식에 맞는 퀴즈를 하나도 파싱하지 못했습니다.")
 
     # 먼저 전체 형식이 맞는 퀴즈 수만 체크 (여기선 에러 발생 안 함)
