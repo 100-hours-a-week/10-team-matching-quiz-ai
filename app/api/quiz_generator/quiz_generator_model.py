@@ -56,6 +56,7 @@ def initialize_quiz_model():
             trust_remote_code=True,
             device_map="auto",
             torch_dtype=dtype,
+            load_in_4bit=True
         ).to(device)
 
         logger.info("Quiz model initialized successfully")
