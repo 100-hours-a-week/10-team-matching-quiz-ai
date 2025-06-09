@@ -6,15 +6,10 @@ from pydantic import BaseModel, Field, HttpUrl
 
 # 질문 별 상세 내용 : 시작(초), 종료(초), 질문별 Interview id, 질문 내용
 class QuestionItem(BaseModel):
-    to: int 
+    start_time: int 
+    end_time: int 
     interview_id: str 
     question: str 
-
-    # 예약어 from 처리
-    class Config:
-        fields = {
-            'from_': 'from',  # JSON 키 이름을 'from'으로 매핑
-        }
 
 # audio 음성(S3), 질문 리스트
 class VoiceFeedbackRequest(BaseModel):
