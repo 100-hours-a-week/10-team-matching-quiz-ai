@@ -70,8 +70,9 @@ typing_extensions = "4.13.2"
 httpx = "^0.28.1"
 tiktoken = "0.9.0"
 pydantic =  "^2.11.3"
-pydub = "^0.25.1"
+pydub = "^0.25.1" # 음성 파일 처리
 google-generativeai = "^0.8.5"
+whisperx = { git = "https://github.com/m-bain/whisperx.git" }
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
