@@ -33,18 +33,24 @@ model = AutoModelForCausalLM.from_pretrained(
     torch_dtype=dtype
 ).to(device)
 
-# 퀴즈 생성 함수
-def generate_quiz(prompt: str, max_tokens: int = 3000) -> str:
+
+def generate_quiz(prompt: str, max_tokens: int = 1000, use_chat_template: bool = True) -> str:
     print("prompt 생성 및 디바이스 전송 중...")
 
-    prompt_tokens = tokenizer(prompt)['input_ids']
-    print(f"[DEBUG] Prompt token 수: {len(prompt_tokens)}")
+    if use_chat_template:
+        messages = [{"role": "user", "content": prompt}]
+        text = tokenizer.apply_chat_template(
+            messages,
+            tokenize=False,
+            add_generation_prompt=True,
+            enable_thinking=False
+        )
+    else:
+        text = prompt
 
-    # context window 제한
-    max_context = 16392 - max_tokens
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=max_context).to(device)
+    max_context = 2048 - max_tokens
+    inputs = tokenizer(text, return_tensors="pt", truncation=True, max_length=max_context).to(device)
 
-    print("quiz generate 시작")
     output = model.generate(
         **inputs,
         max_new_tokens=max_tokens,
@@ -54,7 +60,5 @@ def generate_quiz(prompt: str, max_tokens: int = 3000) -> str:
         top_p=0.9,
         repetition_penalty=1.05
     )
-    
-    decoded = tokenizer.decode(output[0], skip_special_tokens=True)
-    print("quiz 생성 완료")
-    return decoded
+
+    return tokenizer.decode(output[0], skip_special_tokens=True)
