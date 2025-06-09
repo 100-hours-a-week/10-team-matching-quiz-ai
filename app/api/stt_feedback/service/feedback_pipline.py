@@ -22,7 +22,7 @@ def run_feedback_pipeline(
         for i, q in enumerate(questionLists):
             try:
                 logger.info(f"[{i+1}/{len(questionLists)}] 질문 처리 중: '{q['question']}'")
-                segment = cut_audio(local_path, q["from"], q["to"])
+                segment = cut_audio(local_path, q["start_time"], q["end_time"])
                 transcript = transcribe_whisperx(segment)
                 result = generate_feedback_gemini(q["question"], transcript)
 

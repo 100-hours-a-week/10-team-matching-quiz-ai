@@ -5,6 +5,7 @@ import google.generativeai as genai
 logger = logging.getLogger("stt")
 genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
+#TODO: LLM 프롬프트 고도화 필요(현재 Gemini 피드백)
 # 아래 프롬프트 기반으로 AI 피드백 생성
 def generate_feedback_gemini(question: str, answer: str) -> dict:
     prompt = f"""
