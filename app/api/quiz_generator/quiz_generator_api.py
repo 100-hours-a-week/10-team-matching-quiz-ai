@@ -3,6 +3,7 @@ from app.api.quiz_generator.quiz_generator_schema import (
     FollowupRequest,
     FollowupResponse,
     QuizItem,
+    QuizData
 )
 from app.api.quiz_generator.quiz_generator_parser import (
     parse_response,
@@ -135,10 +136,6 @@ def generate_quiz_api(req: FollowupRequest):
     # 프롬프트 내용 제거
     cleaned_output = remove_prompt_content(raw_output)
 
-    # 디버깅 출력 추가
-    print("[CLEANED OUTPUT PREVIEW]")
-    print(cleaned_output[:200])
-
     # 파싱 시간 추적
     parsing_span = trace.span(name="response_parsing") if trace else None
     parsing_start_time = time.time()
@@ -235,5 +232,8 @@ def generate_quiz_api(req: FollowupRequest):
 
     return FollowupResponse(
         message="quiz_generated",
-        data={"user_id": req.interview_id, "questions": quiz_items},
+        data=QuizData(  
+            interview_id=req.interview_id,
+            questions=quiz_items
+        )
     )
