@@ -9,6 +9,8 @@ from typing import Dict, Any, Optional
 from enum import Enum
 from datetime import datetime
 from fastapi import APIRouter
+from app.api.question_generator.question_generator_api import router as generate_router
+from app.api.quiz_generator.quiz_generator_api import router as quiz_router
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
