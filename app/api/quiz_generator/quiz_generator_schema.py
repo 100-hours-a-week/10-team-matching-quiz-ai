@@ -15,7 +15,7 @@ class QuizItem(BaseModel):
     explanation: str
 
 class QuizData(BaseModel):
-    user_id: str
+    interview_id: str
     questions: List[QuizItem]
 
 class FollowupResponse(BaseModel):
