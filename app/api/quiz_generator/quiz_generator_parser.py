@@ -6,10 +6,10 @@ import random
 def parse_choices(raw_options: str) -> List[str]:
     split_by_letter = re.findall(r"[A-D]\.\s*([^A-D]+?)(?=(?:[A-D]\.|$))", raw_options)
     if len(split_by_letter) == 4:
-        return [opt.strip() for opt in split_by_letter]
+        return [opt.strip().strip('"') for opt in split_by_letter] 
 
     options = re.split(r"[,\n]", raw_options)
-    options = [opt.strip() for opt in options if opt.strip()]
+    options = [opt.strip().strip('"') for opt in options if opt.strip()]  
     return options if len(options) == 4 else []
 
 

@@ -133,7 +133,7 @@ def question_rag_retriever(
 def quiz_rag_retriever(
     questions: List[str],
     top_k: int = 1,
-    sim_threshold: float = 0.7
+    sim_threshold: float = 0.6
 ) -> List[Dict[str, any]]:
     """
     여러 개의 질문에 대해 RAG 검색을 수행하여 각각의 결과를 반환
