@@ -1,7 +1,6 @@
 
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
-from app.api import router
 from app.config.model_config import ENVIRONMENT, ENABLED_MODELS
 import logging
 import os
@@ -245,7 +244,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-app.include_router(router)
+# app.include_router(router)
 
 
 # 유틸리티 함수들
