@@ -1,98 +1,82 @@
+
 import asyncio
-import torch
-import re
 import logging
-from vllm import LLM, SamplingParams
-from langfuse import Langfuse
 import os
-from typing import Optional, Union, Dict, Any, List
+import time
+import uuid
+from vllm import SamplingParams
+from vllm.engine.arg_utils import AsyncEngineArgs
+from vllm.engine.async_llm_engine import AsyncLLMEngine
+from langfuse import Langfuse
+from typing import Optional
 from huggingface_hub import login
 from openai import OpenAI
-from dotenv import load_dotenv
-# .env 파일 로드
-load_dotenv()
+from app.api.question_generator.question_generator_config import (
+    HF_TOKEN,
+    MODEL_PATH,
+    OPENAI_API_KEY,
+    LANGFUSE_CONFIG,
+    VLLM_CONFIG,
+    SAMPLING_CONFIG,
+    API_CONFIG,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-HF_TOKEN = os.getenv("HF_TOKEN")
+# 설정 로드
 if HF_TOKEN:
     try:
         login(token=HF_TOKEN)
-        logger.info("Successfully logged in to Hugging Face Hub")
+        logger.info("Hugging Face Hub에 성공적으로 로그인했습니다.")
     except Exception as e:
-        logger.warning(f"Failed to login to Hugging Face Hub: {e}")
+        logger.warning(f"Hugging Face Hub 로그인 실패: {e}")
 
-MODEL_PATH = os.getenv("LLM_MODEL_PATH")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
+langfuse = Langfuse(**LANGFUSE_CONFIG) if all(LANGFUSE_CONFIG.values()) else None
+openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
 
-langfuse = Langfuse(
-    secret_key=os.getenv('LANGFUSE_SECRET_KEY'),
-    public_key=os.getenv('LANGFUSE_PUBLIC_KEY'),
-    host=os.getenv('LANGFUSE_HOST')
-)
-
-# 지연 초기화를 위한 전역 변수
-llm = None
-
-
-def str2bool(value: str) -> bool:
-    return value.lower() in ("true", "1", "yes")
+llm: Optional[AsyncLLMEngine] = None
 
 
 def initialize_llm():
-    """LLM을 초기화하는 함수 - 처음에 실행할때만 호출"""
+    """LLM을 초기화하는 함수"""
     global llm
     if llm is not None:
+        logger.info("AsyncLLMEngine이 이미 초기화되어 있습니다.")
         return llm
 
+    os.environ["VLLM_WORKER_MULTIPROC_METHOD"] = "spawn"
     try:
-        dtype_env = os.getenv("DTYPE", "auto")
-        peft_path = os.getenv("VLLM_PEFT_MODEL", None)
-        tensor_parallel_size_env = int(
-            os.getenv("VLLM_TENSOR_PARALLEL_SIZE", "1"))
-        trust_remote_code_env = str2bool(
-            os.getenv("VLLM_TRUST_REMOTE_CODE", "True"))
-        download_dir_env = os.getenv("VLLM_DOWNLOAD_DIR", "./model_cache")
-        max_model_len_env = int(os.getenv("VLLM_MAX_MODEL_LEN", "2048"))
-        gpu_memory_utilization_env = float(
-            os.getenv("VLLM_GPU_MEMORY_UTILIZATION", "0.9"))
-        max_num_batched_tokens_env = int(
-            os.getenv("VLLM_MAX_NUM_BATCHED_TOKENS", "4096"))
-        max_num_seqs_env = int(os.getenv("VLLM_MAX_NUM_SEQS", "256"))
-        enforce_eager_env = str2bool(os.getenv("VLLM_ENFORCE_EAGER", "False"))
-        quantization_env = os.getenv(
-            "VLLM_QUANTIZATION", None)  # 예: "awq" 또는 "gptq"
-        load_format_env = os.getenv("VLLM_LOAD_FORMAT", None)
-
-        llm = LLM(
+        engine_args = AsyncEngineArgs(
             model=MODEL_PATH,
-            peft_model=peft_path,
-            tensor_parallel_size=tensor_parallel_size_env,
-            trust_remote_code=trust_remote_code_env,
-            dtype=dtype_env,
-            # quantization=quantization_env,  # 양자화 설정이 필요한 경우 주석 해제
-            # load_format="bitsandbytes",
-            download_dir=download_dir_env,
-            max_model_len=max_model_len_env,
-            gpu_memory_utilization=gpu_memory_utilization_env,
-            max_num_batched_tokens=max_num_batched_tokens_env,
-            max_num_seqs=max_num_seqs_env,
-            enforce_eager=enforce_eager_env
+            tokenizer=MODEL_PATH,
+            tensor_parallel_size=VLLM_CONFIG["tensor_parallel_size"],
+            trust_remote_code=VLLM_CONFIG["trust_remote_code"],
+            dtype=VLLM_CONFIG["dtype"],
+            quantization=VLLM_CONFIG["quantization"],
+            download_dir=VLLM_CONFIG["download_dir"],
+            max_model_len=VLLM_CONFIG["max_model_len"],
+            gpu_memory_utilization=VLLM_CONFIG["gpu_memory_utilization"],
+            max_num_batched_tokens=VLLM_CONFIG["max_num_batched_tokens"],
+            max_num_seqs=VLLM_CONFIG["max_num_seqs"],
+            enforce_eager=VLLM_CONFIG["enforce_eager"],
+            enable_chunked_prefill=True,
+            disable_log_requests=True,
+            kv_cache_dtype=VLLM_CONFIG["kv_cache_dtype"],
         )
-        logger.info(
-            f"Hugging Face 모델 로드 성공: {MODEL_PATH} with params: "
-            f"dtype={dtype_env}, tensor_parallel_size={tensor_parallel_size_env}, "
-            f"trust_remote_code={trust_remote_code_env}, download_dir='{download_dir_env}', "
-            f"max_model_len={max_model_len_env}, gpu_memory_utilization={gpu_memory_utilization_env}, "
-            f"max_num_batched_tokens={max_num_batched_tokens_env}, max_num_seqs={max_num_seqs_env}, "
-            f"enforce_eager={enforce_eager_env}"
-        )
+
+        llm = AsyncLLMEngine.from_engine_args(engine_args)
+        logger.info(f"AsyncLLMEngine 모델 로드 성공: {MODEL_PATH}")
         return llm
     except Exception as e:
-        logger.error(f"Hugging Face 모델 로드 실패: {e}")
+        logger.error(f"AsyncLLMEngine 모델 로드 실패: {e}")
         raise
+
+
+def get_llm_engine():
+    """현재 글로벌 LLM 엔진 반환"""
+    global llm
+    return llm
 
 
 async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None) -> str:
@@ -110,164 +94,204 @@ async def call_llm(prompt: str, try_fallback: bool = True, trace_id: str = None)
     Raises:
         Exception: LLM 호출 과정에서 발생한 예외 (fallback이 false이거나 fallback도 실패한 경우)
     """
+    # 글로벌 LLM 엔진 직접 사용
     global llm
+    llm_engine = llm
 
-    def _generate():
-        temperature_env = float(os.getenv("VLLM_SAMPLING_TEMPERATURE", "0.7"))
-        top_p_env = float(os.getenv("VLLM_SAMPLING_TOP_P", "0.9"))
-        top_k_env = int(os.getenv("VLLM_SAMPLING_TOP_K", "50"))
-        repetition_penalty_env = float(
-            os.getenv("VLLM_SAMPLING_REPETITION_PENALTY", "1.15"))
-        max_tokens_env = int(os.getenv("VLLM_SAMPLING_MAX_TOKENS", "150"))
-        stop_sequences_str = os.getenv(
-            "VLLM_SAMPLING_STOP_SEQUENCES", "질문 5.,질문 6.")
-        stop_sequences_env = [seq.strip() for seq in stop_sequences_str.split(
-            ',') if seq.strip()] if stop_sequences_str else []
-
-        params = SamplingParams(
-            temperature=temperature_env,
-            top_p=top_p_env,
-            top_k=top_k_env,
-            repetition_penalty=repetition_penalty_env,
-            max_tokens=max_tokens_env,
-            stop=stop_sequences_env
+    if llm_engine is None:
+        logger.error("LLM이 초기화되지 않았습니다.")
+        if try_fallback and OPENAI_API_KEY:
+            logger.info("LLM이 초기화되지 않아 OpenAI API로 대체합니다.")
+            return await call_openai_api(prompt, trace_id)
+        raise RuntimeError(
+            "LLM (AsyncLLMEngine)이 초기화되지 않았고 fallback이 비활성화되어 있습니다."
         )
+
+    request_id = uuid.uuid4().hex
+    generation = None
+
+    async def _generate_with_async_engine():
+        params = SamplingParams(
+            temperature=SAMPLING_CONFIG["temperature"],
+            top_p=SAMPLING_CONFIG["top_p"],
+            top_k=SAMPLING_CONFIG["top_k"],
+            repetition_penalty=SAMPLING_CONFIG["repetition_penalty"],
+            max_tokens=SAMPLING_CONFIG["max_tokens"],
+            stop=SAMPLING_CONFIG["stop_sequences"],
+        )
+
+        results_generator = llm_engine.generate(prompt, params, request_id)
+
+        final_output_text = ""
         try:
-            outputs = llm.generate([prompt], params)
-            return outputs[0].outputs[0].text
+            async for request_output in results_generator:
+                if request_output.finished:
+                    if (
+                        request_output.outputs
+                        and request_output.outputs[0].text is not None
+                    ):
+                        final_output_text = request_output.outputs[0].text
+                    else:
+                        logger.warning(
+                            f"요청 {request_id}이 완료되었지만 텍스트 출력을 찾을 수 없거나 출력이 None입니다."
+                        )
+                    break
+            return final_output_text
         except Exception as e:
-            logger.error(f"LLM 생성 오류: {e}")
+            logger.error(f"요청 {request_id}에 대한 AsyncLLMEngine 생성 오류: {e}")
+            if llm_engine:
+                asyncio.create_task(llm_engine.abort(request_id))
             raise
 
+    generation = None
     try:
         generation_kwargs = {
-            "name": "local-llm-call",
+            "name": "local-llm",
             "model": MODEL_PATH,
             "input": prompt,
-            "metadata": {
-                "temperature": float(os.getenv("VLLM_SAMPLING_TEMPERATURE", "0.7")),
-                "top_p": float(os.getenv("VLLM_SAMPLING_TOP_P", "0.9")),
-                "top_k": int(os.getenv("VLLM_SAMPLING_TOP_K", "50")),
-                "repetition_penalty": float(os.getenv("VLLM_SAMPLING_REPETITION_PENALTY", "1.15")),
-                "max_tokens": int(os.getenv("VLLM_SAMPLING_MAX_TOKENS", "150")),
-            }
+            "metadata": SAMPLING_CONFIG,
         }
 
         if trace_id:
             generation_kwargs["trace_id"] = trace_id
 
-        generation = langfuse.generation(**generation_kwargs)
+        if langfuse:
+            generation = langfuse.generation(**generation_kwargs)
 
         start_time = asyncio.get_event_loop().time()
         timeout = float(os.getenv("LLM_TIMEOUT", "60.0"))
-        result = await asyncio.wait_for(
-            asyncio.to_thread(_generate),
-            timeout=timeout
-        )
+
+        result = await asyncio.wait_for(_generate_with_async_engine(), timeout=timeout)
         execution_time = asyncio.get_event_loop().time() - start_time
 
-        generation.end(
-            output=result,
-            metadata={"execution_time_seconds": execution_time,
-                      **generation_kwargs["metadata"]}
-        )
-
-        return result
-    except (asyncio.TimeoutError, Exception) as e:
-        error_type = "TimeoutError" if isinstance(
-            e, asyncio.TimeoutError) else "Error"
-        error_message = "LLM 응답 시간 초과" if isinstance(
-            e, asyncio.TimeoutError) else f"LLM 호출 실패: {str(e)}"
-
-        if 'generation' in locals() and generation:  # generation 객체가 생성되었는지 확인
+        if generation:
             generation.end(
-                error=error_message,
-                metadata=generation_kwargs.get(
-                    "metadata", {})  # 에러 시에도 메타데이터 기록
+                output=result,
+                metadata={
+                    "execution_time_seconds": execution_time,
+                    **generation_kwargs["metadata"],
+                },
             )
+        return result
+
+    except (asyncio.TimeoutError, Exception) as e:
+        error_type = "TimeoutError" if isinstance(e, asyncio.TimeoutError) else "Error"
+        error_message = (
+            f"LLM ({MODEL_PATH}) 응답 시간 초과 ({timeout}초)"
+            if isinstance(e, asyncio.TimeoutError)
+            else f"LLM ({MODEL_PATH}) 호출 실패: {str(e)}"
+        )
 
         logger.error(error_message)
 
+        asyncio.create_task(llm_engine.abort(request_id))
+
+        if generation:  # generation 객체가 존재하는지 확인
+            generation.end(
+                error=error_message, metadata=generation_kwargs.get("metadata", {})
+            )
+
         if try_fallback and OPENAI_API_KEY:
-            logger.info("로컬 LLM 실패, OpenAI API로 fallback")
+            logger.info(
+                f"로컬 LLM ({MODEL_PATH}) 실패/타임아웃, OpenAI API로 fallback합니다."
+            )
             return await call_openai_api(prompt, trace_id)
 
         if isinstance(e, asyncio.TimeoutError):
+            # 특정 TimeoutError로 다시 발생
             raise TimeoutError(error_message)
         else:
-            raise Exception(error_message)
+            raise Exception(error_message)  # 일반 예외 다시 발생
 
 
 async def call_openai_api(prompt: str, trace_id: str = None) -> str:
     """
     OpenAI API를 사용하여 프롬프트에 대한 응답을 생성합니다.
     주로 부족한 질문을 채우기 위한 백업 메커니즘으로 사용됩니다.
-
-    Parameters:
-        prompt (str): OpenAI 모델에 전달할 텍스트 프롬프트
-        trace_id (str): 부모 트레이스 ID (있는 경우 사용)
-
-    Returns:
-        str: 모델이 생성한 응답 텍스트
-
-    Raises:
-        Exception: API 호출 과정에서 발생한 예외
     """
-    model_name = "gpt-4o-mini"
+    if not openai_client:
+        raise RuntimeError("OpenAI API 키가 설정되지 않았습니다.")        
+    model_name = API_CONFIG["openai_model"]
+    generation = None  # Langfuse용
 
     try:
         generation_kwargs = {
             "name": "openai-api-call",
             "model": model_name,
             "input": [
-                {"role": "system", "content": "당신은 IT 기술 면접을 위한 질문을 생성하는 도우미입니다."},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "당신은 IT 기술 면접을 위한 질문을 생성하는 도우미입니다.",
+                },
+                {"role": "user", "content": prompt},
             ],
         }
 
         if trace_id:
             generation_kwargs["trace_id"] = trace_id
 
-        generation = langfuse.generation(**generation_kwargs)
+        if langfuse:
+            generation = langfuse.generation(**generation_kwargs)
 
-        response = openai_client.chat.completions.create(
-            model=model_name,
-            messages=[
-                {"role": "system", "content": "당신은 IT 기술 면접을 위한 질문을 생성하는 도우미입니다."},
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.7,
-            max_tokens=500,
-            top_p=0.95
-        )
+        def _blocking_openai_call():
+            return openai_client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": "당신은 IT 기술 면접을 위한 질문을 생성하는 도우미입니다.",
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=0.7,
+                max_tokens=500,  # 환경 변수를 통해 구성 가능하도록 고려
+                top_p=0.95,
+            )
+
+        # 시간 추적 시작
+        start_time = asyncio.get_event_loop().time()
+        response = await asyncio.to_thread(_blocking_openai_call)
+        execution_time = asyncio.get_event_loop().time() - start_time
 
         input_tokens = response.usage.prompt_tokens
         output_tokens = response.usage.completion_tokens
-        cost_per_1k_input = 0.00015
-        cost_per_1k_output = 0.0006
-        cost = (input_tokens / 1000 * cost_per_1k_input) + \
-            (output_tokens / 1000 * cost_per_1k_output)
+        input_cache_tokens = getattr(response.usage, "input_cached_tokens", 0)
+        input_cache_read_tokens = getattr(response.usage, "input_cache_read", 0)
 
-        logger.info(
-            f"OpenAI API 호출 성공: 입력 토큰 {input_tokens}, 출력 토큰 {output_tokens}, 비용 ${cost:.5f}")
+        cost_per_1m_input = 0.15
+        cost_per_1m_output = 0.60
+        cost_per_1m_cache = 0.075
 
-        generation.end(
-            output=response.choices[0].message.content,
-            usage_details={
-                "input": input_tokens,
-                "output": output_tokens,
-                "total": input_tokens + output_tokens
-            },
-            cost_details={
-                "input": input_tokens / 1000 * cost_per_1k_input,
-                "output": output_tokens / 1000 * cost_per_1k_output,
-                "total": cost
-            }
+        cost = (
+            (input_tokens / 1_000_000) * cost_per_1m_input
+            + (output_tokens / 1_000_000) * cost_per_1m_output
+            + (input_cache_read_tokens / 1_000_000) * cost_per_1m_cache
+            + (input_cache_tokens / 1_000_000) * cost_per_1m_cache
         )
 
+        logger.info(
+            f"OpenAI API ({model_name}) 호출 성공: 입력 토큰 {input_tokens}, 출력 토큰 {output_tokens}, 비용 ${cost:.6f}, 실행 시간 {execution_time:.2f}초"
+        )
+
+        if generation:
+            generation.end(
+                output=response.choices[0].message.content,
+                usage={
+                    "promptTokens": input_tokens,
+                    "completionTokens": output_tokens,
+                    "totalTokens": input_tokens + output_tokens,
+                },
+                metadata={
+                    "cost_usd": cost,
+                    "model_name": model_name,
+                    "execution_time_seconds": execution_time,
+                },
+            )
         return response.choices[0].message.content
+
     except Exception as e:
-        if 'generation' in locals() and generation:  # generation 객체가 생성되었는지 확인
-            generation.end(error=str(e))
-        logger.error(f"OpenAI API 호출 오류: {e}")
+        error_message = f"OpenAI API ({model_name}) 호출 오류: {str(e)}"
+        logger.error(error_message)
+        if generation:
+            generation.end(error=error_message)
         raise

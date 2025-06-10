@@ -1,159 +1,77 @@
 import re
 import unicodedata
 import logging
-from typing import List, Pattern, Tuple, Dict, Set, Optional
+from typing import List, Optional
+from app.api.question_generator.question_generator_config import PARSER_CONFIG
 
 logger = logging.getLogger(__name__)
 
-_BRACKETS: Dict[str, str] = {'(': ')', '[': ']', '{': '}'}
-_QUOTES: Set[str] = {'"', "'", '“', '”', '‘', '’'}
+# 설정에서 최대 질문 길이 가져오기
+MAX_QUESTION_LENGTH = PARSER_CONFIG["max_question_length"]
 
+# "질문 1. ..." 또는 "Q1. ..." 형식의 질문 문장을 추출하는 정규식
+QUESTION_PATTERN = re.compile(
+    r"^(?:질문|문제|꼬리질문|꼬리\s*질문|Question|Q)\s*\d+\s*\.\s*(.+)", re.IGNORECASE
+)
 
-def _fix(text: str) -> str:
-    stk: List[str] = []
-    for ch in text:
-        if ch in _BRACKETS:
-            stk.append(ch)
-        elif stk and ch == _BRACKETS.get(stk[-1], ''):
-            stk.pop()
-    if stk:
-        pos = text.rfind('\n')
-        pos = pos + 1 if pos != -1 else len(text)
-        text = text[:pos] + ''.join(_BRACKETS[b]
-                                    for b in reversed(stk)) + text[pos:]
-    for q in _QUOTES:
-        if text.count(q) % 2 != 0:
-            text += q
-    return text
+# 문장이 마침표, 느낌표, 물음표, … 등으로 끝나는지 확인하는 정규식
+ENDING_PUNCT_PATTERN = re.compile(r"[\.\!\?…]$")
+
+# 빈 줄(공백 문자만 있는 줄)을 판별하는 정규식
+EMPTY_LINE_PATTERN = re.compile(r"^\s*$")
+
+# 마크다운 형식의 링크를 감지하는 정규식: [텍스트](URL)
+MD_LINK_PATTERN = re.compile(r"\[([^\]]+)\]\([^)]+\)")
+
+# 마크다운 취소선 형식(~~내용~~)을 감지하는 정규식
+MD_STRIKETHROUGH_PATTERN = re.compile(r"~~([^~]+)~~")
+
+# 마크다운 서식 기호(굵게, 기울임, 코드, 헤더 등)를 감지하는 정규식
+MD_FORMATTING_PATTERN = re.compile(r"(\*\*|\*|_|`|#+)")
 
 
 def _norm(text: str) -> str:
+    """텍스트를 정규화"""
     text = unicodedata.normalize("NFC", text)
-    text = re.sub(r'\s+', ' ', text).strip()
-    if not re.search(r'[\.\!\?…\"\'\)\]\}]$', text):
-        text += '.'
+    text = re.sub(r"\s+", " ", text).strip()
+    if not ENDING_PUNCT_PATTERN.search(text):
+        text += "."
     return text
 
 
 def _strip_md(s: str) -> str:
-    s = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', s)
-    s = re.sub(r'~~([^~]+)~~', r'\1', s)
-    return re.sub(r'(\*\*|\*|`|#+)', '', s)
+    """마크다운 서식을 제거"""
+    s = MD_LINK_PATTERN.sub(r"\1", s)
+    s = MD_STRIKETHROUGH_PATTERN.sub(r"\1", s)
+    s = MD_FORMATTING_PATTERN.sub("", s)
+    return s.strip()
 
 
-_NEXT = (
-    r"\n\s*(?:"
-    r"-?\s*(?:질문|문제|Question)\s+\d+\.?\:?|"
-    r"Q\s*\d+\.?\:?|"
-    r"\d+\.\s+|"
-    r"\d+\)\s+|"
-    r"###\s*Question\s+\d+\:?|"
-    r"###)"
-)
+def parse_questions(text: str, strip_md: bool = True) -> List[str]:
+    """정제된 텍스트에서 질문을 추출"""
+    parsed_questions: List[str] = []
+    lines = text.split("\n")
 
-_PATS: Tuple[Pattern[str], ...] = tuple(
-    re.compile(p, re.M | re.S) for p in (
-        rf"^\s*(?:질문|문제)\s+\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
-        rf"^\s*###\s*질문\s+\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
-        rf"^\s*Q\s*\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
-        rf"^\s*Question\s+\d+\.?\s*(.+?)(?={_NEXT}|\Z)",
-        rf"^\s*\d+\.\s+(.+?)(?={_NEXT}|\Z)",
-        rf"^\s*\d+\)\s+(.+?)(?={_NEXT}|\Z)",
-        rf"^\s*###\s*Question\s+\d+\:?\s*(.+?)(?={_NEXT}|\Z)",
-    )
-)
+    for line in lines:
+        line = line.strip()
+        match = QUESTION_PATTERN.match(line)
 
-_META_PATTERNS = [
-    r'^\s*\[.+?\]:\s*.+$',
-    r'^\s*\*\*\[.+?\]\*\*:.*$',
-    r'^\s*\[.+?\]$',
-    r'^\s*\*\*\[.+?\]\*\*$',
-    r'^\s*#+ .+$',
-    r'^\s*\*\*.+?\*\*$',
-    r'^\s*-\s+.*',
-    r'^.*사용자.*정보.*$',
-    r'^.*지원자.*답변.*$',
-    r'^.*메인.*질문.*$',
-    r'^.*사용자.*키워드.*$',
-    r'^.*이전.*질문.*목록.*$',
-    r'^.*참고.*질문.*목록.*$',
-]
+        if match:
+            question_text = match.group(1).strip()
 
-_QUESTION_HINTS = (
-    r'\?'
-    r'|무엇|어떻게|어디서|언제|누구|왜|어떤'
-    r'|차이점|비교|장단점'
-    r'|설명(?:해|하)[가-힣]*'
-    r'|말씀(?:해|해줄)[가-힣]*'
-    r'|주세요'
-)
+            if strip_md:
+                question_text = _strip_md(question_text)
 
+            question_text = _norm(question_text)
 
-def is_likely_question(text: str) -> bool:
-    if any(re.search(p, text, re.I) for p in _META_PATTERNS):
-        return False
-    if len(text.strip()) < 10:
-        return False
-    return bool(re.search(_QUESTION_HINTS, text))
+            if len(question_text) <= MAX_QUESTION_LENGTH:
+                parsed_questions.append(question_text)
+            else:
+                logger.warning(
+                    f"질문이 {MAX_QUESTION_LENGTH}자를 초과하여 제외됩니다 "
+                    f"(길이: {len(question_text)}): {question_text}"
+                )
+        elif line and not EMPTY_LINE_PATTERN.match(line):
+            logger.debug(f"질문 형식에 맞지 않는 라인입니다: {line}")
 
-
-def korean_char_length(text: str) -> int:
-    return sum(1 for _ in text)
-
-
-def parse_questions(
-    text: str,
-    extra_pats: Optional[List[Pattern[str]]] = None,
-    strip_md: bool = True,
-) -> List[str]:
-    txt = text.replace("\n...\n[출력 형식 예시]", "").strip()
-    if txt.endswith("\nassistant"):
-        txt = txt[: -len("\nassistant")]
-
-    msec = re.search(r'##\s*\S*생성\s*결과[^\n]*', txt)
-    if msec:
-        txt = txt[msec.start():]
-
-    m = re.search(r'(?:질문|문제|Question|Q)\s*\d+\.?|###\s*질문', txt)
-    if m:
-        txt = txt[m.start():]
-
-    if len(txt) < 5:
-        raise ValueError("텍스트가 너무 짧습니다")
-
-    pats = list(_PATS) + (extra_pats or [])
-    spans: List[Tuple[int, int, str]] = []
-    for p in pats:
-        for m in p.finditer(txt):
-            spans.append((m.start(1), m.end(1), m.group(1).strip()))
-
-    if not spans:
-        logger.info("패턴 매칭 실패, 휴리스틱 사용")
-        questions: List[str] = []
-        for line in txt.split('\n'):
-            line = line.strip()
-            if len(line) > 15 and is_likely_question(line) and korean_char_length(line) <= 100:
-                questions.append(_norm(_fix(line)))
-        return questions
-
-    spans.sort(key=lambda x: (x[0], -(x[1] - x[0])))
-    qs: List[str] = []
-    seen: Set[str] = set()
-    end = -1
-    for s, e, raw in spans:
-        if s < end:
-            continue
-        end = e
-        q = raw
-        if strip_md:
-            q = _strip_md(q)
-        q = q.strip().rstrip(',. ')
-        if len(q) < 10 or q in seen:
-            continue
-        q = _norm(_fix(q))
-        if korean_char_length(q) > 100:
-            continue
-        if is_likely_question(q):
-            qs.append(q)
-            seen.add(q)
-    return qs
+    return parsed_questions
