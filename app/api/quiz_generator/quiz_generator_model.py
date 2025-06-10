@@ -56,6 +56,7 @@ def initialize_quiz_model():
             trust_remote_code=True,
             device_map="auto",
             torch_dtype=dtype,
+            load_in_4bit=True
         ).to(device)
 
         logger.info("Quiz model initialized successfully")
@@ -66,7 +67,7 @@ def initialize_quiz_model():
         raise
 
 
-def generate_quiz(prompt: str, max_tokens: int = 3000) -> str:
+def generate_quiz(prompt: str, max_tokens: int = 2048, use_chat_template: bool = False) -> str:
     """퀴즈 생성 함수 - 모델 관리자를 통해 접근"""
     try:
         # 모델 관리자를 통해 모델 데이터 가져오기 (지연 로딩 지원)
@@ -79,6 +80,19 @@ def generate_quiz(prompt: str, max_tokens: int = 3000) -> str:
         model = model_data["model"]
         tokenizer = model_data["tokenizer"]
 
+        use_chat_template = True
+
+        if use_chat_template:
+            messages = [{"role": "user", "content": prompt}]
+            text = tokenizer.apply_chat_template(
+                messages,
+                tokenize=False,
+                add_generation_prompt=True,
+                enable_thinking=False
+            )
+        else:
+            text = prompt
+
         logger.info("Starting quiz generation...")
         logger.debug(f"Input prompt length: {len(prompt)} characters")
 
@@ -90,9 +104,9 @@ def generate_quiz(prompt: str, max_tokens: int = 3000) -> str:
         device = next(model.parameters()).device
 
         # Context window 제한 (모델의 최대 길이에 맞춰 조정)
-        max_context = 16392 - max_tokens
+        max_context = 4096 - max_tokens
         inputs = tokenizer(
-            prompt, return_tensors="pt", truncation=True, max_length=max_context
+            text, return_tensors="pt", truncation=True, max_length=max_context
         ).to(device)
 
         logger.info("Generating quiz content...")

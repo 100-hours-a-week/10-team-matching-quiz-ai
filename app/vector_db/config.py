@@ -4,9 +4,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # Model Config
-EMBEDDING_MODEL_NAME = os.getenv(
-    "EMBEDDING_MODEL_NAME", "Alibaba-NLP/gte-multilingual-base"
-)
+EMBEDDING_MODEL_NAME = os.getenv("EMBEDDING_MODEL_NAME", "Alibaba-NLP/gte-multilingual-base")
 KEYBERT_MODEL_NAME = os.getenv("KEYBERT_MODEL_NAME")
 
 # vector DB Config
