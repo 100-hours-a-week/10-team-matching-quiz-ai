@@ -80,7 +80,7 @@ def generate_quiz(prompt: str, max_tokens: int = 4096, use_chat_template: bool =
         model = model_data["model"]
         tokenizer = model_data["tokenizer"]
 
-        use_chat_template = False 
+        use_chat_template = True
 
         if use_chat_template:
             messages = [{"role": "user", "content": prompt}]

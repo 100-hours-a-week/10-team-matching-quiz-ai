@@ -132,7 +132,7 @@ def question_rag_retriever(
 
 def quiz_rag_retriever(
     questions: List[str],
-    top_k: int = 3,
+    top_k: int = 1,
     sim_threshold: float = 0.7
 ) -> List[Dict[str, any]]:
     """
