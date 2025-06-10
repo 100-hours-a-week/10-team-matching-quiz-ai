@@ -100,20 +100,7 @@ def generate_quiz_api(req: FollowupRequest):
         prompt_text = str(prompt_template)
         prompt = prompt_text.replace("{{joined_questions}}", joined_questions)
         prompt = prompt.replace("{{related_questions}}", related_questions_text)
-    prompt += (
-        "\n\n출력 지침:\n"
-        "- 출력은 반드시 15~20개의 4지선다형 문제로 구성되어야 합니다.\n"
-        "- 각 문제는 아래와 같은 형식을 따릅니다:\n"
-        "  난이도: 하 | 중 | 상\n"
-        "  문제: (자연어 문장)\n"
-        "  선지: [보기1, 보기2, 보기3, 보기4]  # JSON 배열 형태\n"
-        "  정답 인덱스: 1~4 사이의 숫자\n"
-        "  해설: 정답의 이유나 부가 설명\n"
-        "- 출력에는 위 문제 형식만 포함하고, 지시사항이나 설명 문구는 포함하지 마세요.\n"
-        "- JSON 포맷은 사용하지 않고, 자유 포맷의 텍스트로 출력하세요.\n"
-        "- 각 문제는 줄바꿈을 포함해 구분되도록 출력할 것.\n"
-        "--- END OF INSTRUCTION ---"
-    )
+    prompt += ("--- END OF INSTRUCTION ---")
 
     # prompt 생성 span
     prompt_span = trace.span(name="build_prompt") if trace else None
