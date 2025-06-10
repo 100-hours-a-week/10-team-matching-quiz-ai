@@ -3,13 +3,24 @@ from typing import List, Dict
 import random
 
 
+import ast
+
 def parse_choices(raw_options: str) -> List[str]:
+    try:
+        # ["\"보기1\"", "\"보기2\""] 형태 대응
+        parsed = ast.literal_eval(raw_options)
+        return [opt.strip().strip('"') for opt in parsed if isinstance(opt, str)]
+    except (ValueError, SyntaxError):
+        pass
+
+    # A. ~ 혹은 줄바꿈으로 구분된 선지일 경우
     split_by_letter = re.findall(r"[A-D]\.\s*([^A-D]+?)(?=(?:[A-D]\.|$))", raw_options)
     if len(split_by_letter) == 4:
-        return [opt.strip().strip('"') for opt in split_by_letter] 
+        return [opt.strip().strip('"') for opt in split_by_letter]
 
+    # 기타 일반 케이스
     options = re.split(r"[,\n]", raw_options)
-    options = [opt.strip().strip('"') for opt in options if opt.strip()]  
+    options = [opt.strip().strip('"') for opt in options if opt.strip()]
     return options if len(options) == 4 else []
 
 
