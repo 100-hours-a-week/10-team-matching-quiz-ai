@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from app.api.stt_feedback.stt_feedback_model import FeedbackResponse
-from app.api.stt_feedback.service import run_feedback_pipeline
+from app.api.stt_feedback.service.feedback_pipline import run_feedback_pipeline
 from app.api.stt_feedback.stt_feedback_schema import VoiceFeedbackRequest
 
 router = APIRouter()
