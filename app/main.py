@@ -9,6 +9,9 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from enum import Enum
 from datetime import datetime
+from fastapi import APIRouter
+from app.api.question_generator.question_generator_api import router as generate_router
+from app.api.quiz_generator.quiz_generator_api import router as quiz_router
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -257,6 +260,9 @@ def is_model_available(model_name: str) -> bool:
 def get_available_models():
     return model_manager.get_available_models()
 
+router = APIRouter()
+router.include_router(generate_router, prefix="/interview", tags=["question-generator"])
+router.include_router(quiz_router, prefix="/quiz", tags=["quiz"])
 
 @app.get("/health")
 async def health_check():
