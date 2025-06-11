@@ -4,16 +4,15 @@ from app.api.stt_feedback.service.audio_service import download_audio, cut_audio
 from app.api.stt_feedback.service.stt_service import transcribe_whisperx
 from app.api.stt_feedback.service.generate_feedback_service import generate_feedback_gemini
 from app.api.stt_feedback.stt_feedback_model import FeedbackResponse, FeedbackItem
+from app.api.stt_feedback.stt_feedback_schema import QuestionItem # 면접 질문 정보 가져오기
 
 logger = logging.getLogger("stt")
 
 # feedback 생성 파이프라인
 def run_feedback_pipeline(
-    interview_id: str,
     recording_url: str,
-    questionLists: List[dict]
+    questionLists: List[QuestionItem]
 ) -> FeedbackResponse:
-    logger.info(f"[PIPELINE] 인터뷰 ID: {interview_id}")
     feedback_items = []
 
     try:
@@ -23,17 +22,18 @@ def run_feedback_pipeline(
         # 2. 각 질문별로 STT 및 Feedback 처리
         for i, q in enumerate(questionLists):
             try:
-                logger.info(f"[{i+1}/{len(questionLists)}] 질문 처리 중: '{q['question']}'")
+                logger.info(f"[{i+1}/{len(questionLists)}] 질문 처리 중: '{q.question}'")
                 # 2-1. 질문 시작, 종료 시간 기준으로 오디올 자르기
-                segment = cut_audio(local_path, q["start_time"], q["end_time"])
+                segment = cut_audio(local_path, q.start_time, q.end_time)
                 # 2-2. WhisperX를 활용한 오디오 전사(with VAD)
                 transcript = transcribe_whisperx(segment)
                 # 2-3. Gemini API로 피드백 및 모범답안 생성
-                result = generate_feedback_gemini(q["question"], transcript)
+                result = generate_feedback_gemini(q.question, transcript)
 
                 # 2-4. 결과 리스트에 질문, 모범답안, 피드백 추가
                 feedback_items.append(FeedbackItem(
-                    question=q["question"],
+                    segment_id=q.segment_id,
+                    question=q.question,
                     model_answer=result["model_answer"],
                     feedback=result["feedback"]
                 ))
@@ -53,11 +53,10 @@ def run_feedback_pipeline(
 
         # 4. 결과 반환
         return FeedbackResponse(
-            interview_id=interview_id,
             feedbackLists=feedback_items
         )
 
     except Exception as e:
         # 전체 프로세스 실패 (다운로드 실패, 예상치 못한 에러, 등)
-        logger.critical(f"[PIPELINE] 전체 파이프라인 오류 - 인터뷰 ID: {interview_id}, 오류: {e}")
+        logger.critical(f"[PIPELINE] 전체 파이프라인 오류 - 오류: {e}")
         raise

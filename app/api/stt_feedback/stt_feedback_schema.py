@@ -6,9 +6,9 @@ from pydantic import BaseModel, Field, HttpUrl
 
 # 질문 별 상세 내용 : 시작(초), 종료(초), 질문별 Interview id, 질문 내용
 class QuestionItem(BaseModel):
+    segment_id: str
     start_time: int 
     end_time: int 
-    interview_id: str 
     question: str 
 
 # audio 음성(S3), 질문 리스트
