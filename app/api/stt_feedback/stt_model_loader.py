@@ -15,7 +15,8 @@ def load_whisperx_model():
     global whisper_model
     try:
         logger.info("[WhisperX] 모델 로딩 시작")
-        whisper_model = whisper_model
+        # whisper_model = whisperx.load_model("small", device=device, compute_type="int8")
+        whisper_model = whisperx.load_model("large-v2", device="cuda", compute_type="auto")
         logger.info("[WhisperX] 모델 로딩 완료")
 
         """
