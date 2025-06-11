@@ -11,7 +11,7 @@ logger = logging.getLogger("stt")
 # feedback 생성 파이프라인
 def run_feedback_pipeline(
     recording_url: str,
-    questionLists: List[QuestionItem]
+    question_lists: List[QuestionItem]
 ) -> FeedbackResponse:
     feedback_items = []
 
@@ -20,9 +20,9 @@ def run_feedback_pipeline(
         local_path = download_audio(recording_url)
 
         # 2. 각 질문별로 STT 및 Feedback 처리
-        for i, q in enumerate(questionLists):
+        for i, q in enumerate(question_lists):
             try:
-                logger.info(f"[{i+1}/{len(questionLists)}] 질문 처리 중: '{q.question}'")
+                logger.info(f"[{i+1}/{len(question_lists)}] 질문 처리 중: '{q.question}'")
                 # 2-1. 질문 시작, 종료 시간 기준으로 오디올 자르기
                 segment = cut_audio(local_path, q.start_time, q.end_time)
                 # 2-2. WhisperX를 활용한 오디오 전사(with VAD)
@@ -41,7 +41,7 @@ def run_feedback_pipeline(
             except Exception as item_error:
                 # 개별 질문 처리 실패시 로그만 찍고 계속 진행
                 logger.error(
-                    f"[PIPELINE][{i+1}/{len(questionLists)}] 질문 처리 실패 - 질문: '{q['question']}', 오류: {item_error}"
+                    f"[PIPELINE][{i+1}/{len(question_lists)}] 질문 처리 실패 - 질문: '{q['question']}', 오류: {item_error}"
                 )
                 continue  # 다음 질문으로 넘어감
 

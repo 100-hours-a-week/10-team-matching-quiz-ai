@@ -17,7 +17,7 @@ async def receive_feedback(request: VoiceFeedbackRequest):
     # 전체 처리: STT + 피드백 + 모범답안 생성
     result = run_feedback_pipeline(
         recording_url=request.recording_url,
-        question_lists=[q.dict(by_alias=True) for q in request.questionLists]
+        question_lists=[q.dict(by_alias=True) for q in request.question_lists]
     )
 
     return result
