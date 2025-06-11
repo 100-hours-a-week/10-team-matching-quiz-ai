@@ -8,4 +8,4 @@ app.include_router(feedback_router, prefix="/feedback", tags=["stt-feedback"])
 
 @app.on_event("startup")
 async def startup_event():
-    load_whisperx_model
+    load_whisperx_model()

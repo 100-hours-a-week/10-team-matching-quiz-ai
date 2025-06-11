@@ -41,7 +41,7 @@ def run_feedback_pipeline(
             except Exception as item_error:
                 # 개별 질문 처리 실패시 로그만 찍고 계속 진행
                 logger.error(
-                    f"[PIPELINE][{i+1}/{len(question_lists)}] 질문 처리 실패 - 질문: '{q['question']}', 오류: {item_error}"
+                    f"[PIPELINE][{i+1}/{len(question_lists)}] 질문 처리 실패 - 질문: '{q.question}', 오류: {item_error}"
                 )
                 continue  # 다음 질문으로 넘어감
 
