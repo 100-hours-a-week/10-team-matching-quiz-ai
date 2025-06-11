@@ -95,3 +95,4 @@ cloudflared
 dataset/
 .pyright/
 .mypy_cache/
+.env_for_api

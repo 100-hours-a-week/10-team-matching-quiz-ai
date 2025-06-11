@@ -27,13 +27,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 try:
-    from app.vector_db.retriever import rag_retriever
-
+    from app.vector_db.retriever import question_rag_retriever
     VECTOR_DB_AVAILABLE = True
     logging.info("Vector DB 모듈이 로드되었습니다.")
 except ImportError:
     VECTOR_DB_AVAILABLE = False
-    rag_retriever = None
+    question_rag_retriever = None
     logging.warning("Vector DB 모듈을 찾을 수 없습니다. RAG 기능이 비활성화됩니다.")
 
 router = APIRouter()
@@ -92,9 +91,9 @@ def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
     rag_span = trace.span(name="rag_retrieval")
     rag_start_time = time.time()
 
-    if VECTOR_DB_AVAILABLE and rag_retriever:
+    if VECTOR_DB_AVAILABLE and question_rag_retriever:
         try:
-            rag_results = rag_retriever(req.selected_question, req.keyword or "")
+            rag_results = question_rag_retriever(req.selected_question, req.keyword or "")
             rag_execution_time = time.time() - rag_start_time
             rag_span.update(
                 input={"query": req.selected_question, "keyword": req.keyword or ""},
