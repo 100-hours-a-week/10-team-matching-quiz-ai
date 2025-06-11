@@ -1,4 +1,3 @@
-
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.config.model_config import ENVIRONMENT, ENABLED_MODELS
@@ -244,6 +243,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+
 # 유틸리티 함수들
 def get_model(model_name: str):
     return model_manager.get_model(model_name)
@@ -256,8 +256,10 @@ def is_model_available(model_name: str) -> bool:
 def get_available_models():
     return model_manager.get_available_models()
 
+
 app.include_router(generate_router, prefix="/interview", tags=["question-generator"])
 app.include_router(quiz_router, prefix="/quiz", tags=["quiz"])
+
 
 @app.get("/health")
 async def health_check():
