@@ -15,8 +15,7 @@ RABBITMQ_VIRTUAL_HOST = "/" # Usually "/" unless specified otherwise
 QUIZ_REQUEST_EXCHANGE_NAME = "quiz.request.exchange"
 QUIZ_REQUEST_EXCHANGE_TYPE = "direct"  # Or your preferred exchange type
 QUIZ_REQUEST_ROUTING_KEY = "quiz.request.routingKey"
-# Queue for the AIServer worker to consume quiz requests from
-QUIZ_PROCESSING_QUEUE_NAME = "quiz.processing.queue" # Worker consumes from this
+QUIZ_REQUEST_QUEUE_NAME = "quiz.request.queue"    # BE consumes from this
 
 # AIServer -> BE (Response with Generated Quiz)
 QUIZ_RESPONSE_EXCHANGE_NAME = "quiz.response.exchange" # Can be the same as request exchange
@@ -45,9 +44,7 @@ SERVICE_EXCHANGE_TYPE = QUIZ_REQUEST_EXCHANGE_TYPE
 # Routing keys for workers (aliases for consistency)
 ROUTING_KEY_QUIZ_GENERATOR = QUIZ_REQUEST_ROUTING_KEY
 ROUTING_KEY_STT_FEEDBACK = STT_FEEDBACK_ROUTING_KEY
-
-# Queue names for workers
-QUIZ_QUEUE_NAME = QUIZ_PROCESSING_QUEUE_NAME
+QUIZ_QUEUE_NAME = QUIZ_REQUEST_QUEUE_NAME
 
 # Common Worker Settings
 PREFETCH_COUNT = 1  # Each worker fetches one message at a time

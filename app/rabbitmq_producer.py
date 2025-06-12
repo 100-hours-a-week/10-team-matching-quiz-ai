@@ -38,19 +38,6 @@ async def get_rabbitmq_connection():
             raise # 연결 실패 시 예외를 다시 발생시켜 호출 측에서 알 수 있도록 함
     return _connection
 
-# def _on_connection_closed(connection, reason):
-#     logger.warning(f"RabbitMQ connection closed: {reason}. Attempting to reconnect...")
-#     # connect_robust가 자동으로 재연결을 시도하므로 별도 로직은 필요 없을 수 있음
-
-# def _on_connection_reconnected(connection):
-#     logger.info("RabbitMQ connection re-established.")
-#     # 재연결 후 채널 및 exchange 재설정이 필요할 수 있음
-#     # global _channel, _exchange
-#     # _channel = None
-#     # _exchange = None
-#     # asyncio.create_task(get_rabbitmq_channel()) # 백그라운드에서 채널 재설정 시도
-
-
 async def get_rabbitmq_channel():
     """
     RabbitMQ 채널 및 Exchange를 가져오거나 기존 것을 반환합니다.
