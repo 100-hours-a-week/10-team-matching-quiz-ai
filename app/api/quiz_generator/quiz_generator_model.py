@@ -67,7 +67,7 @@ def initialize_quiz_model():
         raise
 
 
-def generate_quiz(prompt: str, max_tokens: int = 2048, use_chat_template: bool = False) -> str:
+def generate_quiz(prompt: str, max_tokens: int = 2500, use_chat_template: bool = False) -> str:
     """퀴즈 생성 함수 - 모델 관리자를 통해 접근"""
     try:
         # 모델 관리자를 통해 모델 데이터 가져오기 (지연 로딩 지원)
@@ -92,6 +92,9 @@ def generate_quiz(prompt: str, max_tokens: int = 2048, use_chat_template: bool =
             )
         else:
             text = prompt
+
+        prompt_tokens = tokenizer(text)["input_ids"]
+        logger.info(f"Prompt token count: {len(prompt_tokens)} tokens")
 
         logger.info("Starting quiz generation...")
         logger.debug(f"Input prompt length: {len(prompt)} characters")
