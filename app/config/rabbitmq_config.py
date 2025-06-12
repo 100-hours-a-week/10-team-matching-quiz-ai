@@ -1,4 +1,9 @@
-\
+import os
+from typing import List, Dict, Any
+from dotenv import load_dotenv
+
+load_dotenv()
+
 RABBITMQ_HOST = "localhost"  # GCP VM 내부에서 실행 시 localhost, 외부 브로커 사용 시 해당 주소
 RABBITMQ_PORT = 5672
 RABBITMQ_USER = "guest"  # 실제 환경에 맞게 변경
@@ -22,7 +27,3 @@ PREFETCH_COUNT = 1  # 각 워커가 한 번에 가져올 메시지 수 (환경�
 QUIZ_QUEUE_NAME = "quiz_generation_queue"
 STT_FEEDBACK_QUEUE_NAME = "stt_feedback_queue"
 
-# STT 피드백 워커는 Langfuse를 사용하지 않으므로 관련 설정 제거 또는 주석 처리합니다.
-# # STT_LANGFUSE_SECRET_KEY = "your_stt_langfuse_secret_key_here_if_different"
-# # STT_LANGFUSE_PUBLIC_KEY = "your_stt_langfuse_public_key_here_if_different"
-# # STT_LANGFUSE_HOST = "https://your_langfuse_host_or_cloud_if_different"
