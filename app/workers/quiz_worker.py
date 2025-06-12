@@ -25,6 +25,7 @@ from app.api.quiz_generator.quiz_generator_parser import (
     filter_and_select_quizzes,
     remove_prompt_content,
 )
+from app import rabbitmq_producer
 
 # Setup logging
 logging.basicConfig(
@@ -185,6 +186,31 @@ async def process_quiz_generation_task(message: aio_pika.IncomingMessage):
 
             quiz_items = [QuizItem(**item) for item in final_quizzes] # Validate with Pydantic
             quiz_data_obj = QuizData(interview_id=req.interview_id, questions=quiz_items)
+            
+            # Publish response back to backend
+            response_span = trace.span(name="response_publishing_worker")
+            response_start_time = time.time()
+            try:
+                response_success = await rabbitmq_producer.publish_response_message(
+                    message_body=quiz_data_obj.model_dump(),
+                    exchange_name=rabbitmq_config.QUIZ_RESPONSE_EXCHANGE_NAME,
+                    routing_key=rabbitmq_config.QUIZ_RESPONSE_ROUTING_KEY
+                )
+                if response_success:
+                    logger.info(f"Successfully published quiz response for interview_id: {req.interview_id}")
+                else:
+                    logger.error(f"Failed to publish quiz response for interview_id: {req.interview_id}")
+                    # Don't fail the entire task, but log the error
+            except Exception as e:
+                logger.error(f"Error publishing quiz response for interview_id: {req.interview_id}: {e}")
+                
+            response_execution_time = time.time() - response_start_time
+            response_span.update(
+                input={"interview_id": req.interview_id, "quiz_count": len(quiz_items)},
+                output={"response_published": response_success if 'response_success' in locals() else False},
+                metadata={"execution_time_seconds": response_execution_time}
+            )
+            response_span.end()
             
             request_execution_time = time.time() - request_start_time
             trace.update(

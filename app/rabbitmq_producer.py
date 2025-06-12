@@ -1,10 +1,9 @@
-\
+import logging
 import asyncio
 import aio_pika
 import json
 import uuid
 from app.config import rabbitmq_config # 생성한 설정 파일 import
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -105,6 +104,43 @@ async def publish_message(routing_key: str, message_body: dict):
     except Exception as e:
         logger.error(f"Error publishing message to routing key '{routing_key}': {e}")
         # 필요시 예외 재발생 또는 특정 값 반환
+        return False
+
+async def publish_response_message(message_body: dict, exchange_name: str = None, routing_key: str = None):
+    """
+    응답 메시지를 특정 exchange로 발행합니다 (AI 서버가 BE에 응답할 때 사용).
+    """
+    try:
+        connection = await get_rabbitmq_connection()
+        if connection is None:
+            logger.error("Cannot publish response message due to missing connection.")
+            return False
+            
+        channel = await connection.channel()
+        
+        # 응답용 exchange 선언
+        response_exchange = await channel.declare_exchange(
+            name=exchange_name or rabbitmq_config.QUIZ_RESPONSE_EXCHANGE_NAME,
+            type=aio_pika.ExchangeType(rabbitmq_config.QUIZ_RESPONSE_EXCHANGE_TYPE),
+            durable=True
+        )
+
+        message = aio_pika.Message(
+            body=json.dumps(message_body).encode(),
+            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
+            content_type="application/json",
+            message_id=str(uuid.uuid4())
+        )
+
+        response_routing_key = routing_key or rabbitmq_config.QUIZ_RESPONSE_ROUTING_KEY
+        await response_exchange.publish(message, routing_key=response_routing_key)
+        
+        logger.info(f"Successfully published response message to routing key '{response_routing_key}' (ID: {message.message_id})")
+        await channel.close()
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error publishing response message: {e}")
         return False
 
 async def close_rabbitmq_connection():

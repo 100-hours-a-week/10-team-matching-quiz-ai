@@ -5,6 +5,20 @@ import time
 
 import aio_pika
 
+import asyncio
+import json
+import logging
+import time
+
+import aio_pika
+
+import asyncio
+import json
+import logging
+import time
+
+import aio_pika
+
 # Configs
 from app.config import rabbitmq_config
 
@@ -16,6 +30,7 @@ from app.api.stt_feedback.stt_feedback_schema import VoiceFeedbackRequest
 # Core logic components
 from app.api.stt_feedback.service.feedback_pipline import run_feedback_pipeline
 from app.api.stt_feedback.stt_model_loader import load_whisperx_model, get_whisperx_model
+from app import rabbitmq_producer
 
 # Setup logging
 logging.basicConfig(
@@ -61,7 +76,22 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
             request_execution_time = time.time() - request_start_time
             
             logger.info(f"Successfully processed STT feedback for interview_id: {req.interview_id}.")
-            # Optionally, do something with feedback_result (e.g., store in DB, send notification)
+            
+            # Send response back to backend if feedback_result exists
+            if feedback_result:
+                try:
+                    response_success = await rabbitmq_producer.publish_response_message(
+                        message_body=feedback_result.model_dump(),
+                        exchange_name=rabbitmq_config.STT_RESPONSE_EXCHANGE_NAME,
+                        routing_key=rabbitmq_config.STT_RESPONSE_ROUTING_KEY
+                    )
+                    if response_success:
+                        logger.info(f"Successfully published STT response for interview_id: {req.interview_id}")
+                    else:
+                        logger.error(f"Failed to publish STT response for interview_id: {req.interview_id}")
+                except Exception as e:
+                    logger.error(f"Error publishing STT response for interview_id: {req.interview_id}: {e}")
+            
             logger.info(f"Generated STT Feedback for interview_id {req.interview_id}: {feedback_result.model_dump_json(indent=2) if feedback_result else 'None'}")
 
             await message.ack()
