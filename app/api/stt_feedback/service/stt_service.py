@@ -2,10 +2,10 @@ import whisperx
 import tempfile
 import logging
 from pydub import AudioSegment
-from app.api.stt_feedback.stt_model_loader import whisper_model  # 전역 모델 import
+from app.api.stt_feedback.stt_model_loader import WhisperXModel  # 전역 모델 import
 """
 from app.api.stt_feedback.stt_model_loader import (
-    whisper_model, alignment_model, alignment_metadata
+    WhisperXModel, alignment_model, alignment_metadata
 )
 
 aligned_result = whisperx.align(result["segments"], alignment_model, alignment_metadata, tmp.name, device)
@@ -22,11 +22,20 @@ def transcribe_whisperx(segment: AudioSegment) -> str:
             logger.info(f"[STT] WhisperX VAD 전사 시작: {tmp.name}")
 
             # VAD 적용한 전사 수행
-            result = whisper_model.transcribe(
+            result = WhisperXModel.model(
                 tmp.name,
                 vad_filter=True,
-                vad_parameters={"threshold": 0.5}  # 필요시 조정 가능
+                # vad_parameters={"threshold": 0.5}
             )
+
+            logger.info(f"[STT] WhisperX 반환 타입: {type(result)}")
+            
+            # (혹시 리스트라면 바로 리스트 구조 출력)
+            if isinstance(result, list):
+                 logger.info(f"[STT] WhisperX 반환 결과 (샘플): {result[:1]}")
+            else:
+                logger.info(f"[STT] WhisperX 반환결과: {result}")
+            
             text = result["text"]
 
             # # Alignment 처리 (현재 미사용)
