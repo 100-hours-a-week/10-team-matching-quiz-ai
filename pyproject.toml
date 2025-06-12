@@ -49,6 +49,9 @@ mysql-connector-python = "^8.4.0"
 # ── Test / Export ─────────────────────────────
 pytest = "^8.2.0"
 poetry-plugin-export = "^1.9.0"
+ 
+# RabbitMQ 패키지
+aio-pika = "^0.10.1"
 
 # ── 수동 추가 패키지 ───────────────
 email_validator = "2.2.0"
