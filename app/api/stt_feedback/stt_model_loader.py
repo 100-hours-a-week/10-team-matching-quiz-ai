@@ -16,8 +16,8 @@ class WhisperXModel:
     def load_model(cls):
         try:
             logger.info("[WhisperX] 모델 로딩 시작")
-            # cls.model = whisperx.load_model("small", device=device, compute_type="int8")
-            cls.model = whisperx.load_model("large-v2", device="cuda", compute_type="auto")
+            cls.model = whisperx.load_model("small", device=device, compute_type="int8")
+            # cls.model = whisperx.load_model("large-v2", device="cuda", compute_type="auto")
             logger.info("[WhisperX] 모델 로딩 완료")
 
             """
@@ -25,7 +25,7 @@ class WhisperXModel:
 
             logger.info("[WhisperX] Alignment 모델 로딩 시작 (ko)")
             cls.alignment_model, cls.alignment_metadata = whisperx.load_align_model("ko", device)
-            logger.info("[WhisperX] Alignment 모델 로딩 완료")
+            logger.info("[WhisperX] Alignment 모델 로딩 완료"
             """
         except Exception as e:
             logger.error(f"[WhisperX] 모델 로딩 실패: {e}")

@@ -22,10 +22,10 @@ def transcribe_whisperx(segment: AudioSegment) -> str:
             logger.info(f"[STT] WhisperX VAD 전사 시작: {tmp.name}")
 
             # VAD 적용한 전사 수행
-            result = WhisperXModel.model(
+            result = WhisperXModel.model.transcribe(
                 tmp.name,
                 vad_filter=True,
-                # vad_parameters={"threshold": 0.5}
+                vad_parameters={"threshold": 0.5}
             )
 
             logger.info(f"[STT] WhisperX 반환 타입: {type(result)}")
@@ -36,7 +36,8 @@ def transcribe_whisperx(segment: AudioSegment) -> str:
             else:
                 logger.info(f"[STT] WhisperX 반환결과: {result}")
             
-            text = result["text"]
+            segments = result['segments']
+            text = " ".join([seg['text'] for seg in segments])
 
             # # Alignment 처리 (현재 미사용)
             # model_a, metadata = whisperx.load_align_model(language_code=result["language"], device=device)
