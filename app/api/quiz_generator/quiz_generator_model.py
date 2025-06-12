@@ -93,9 +93,6 @@ def generate_quiz(prompt: str, max_tokens: int = 2500, use_chat_template: bool =
         else:
             text = prompt
 
-        prompt_tokens = tokenizer(text)["input_ids"]
-        logger.info(f"Prompt token count: {len(prompt_tokens)} tokens")
-
         logger.info("Starting quiz generation...")
         logger.debug(f"Input prompt length: {len(prompt)} characters")
 
@@ -107,7 +104,7 @@ def generate_quiz(prompt: str, max_tokens: int = 2500, use_chat_template: bool =
         device = next(model.parameters()).device
 
         # Context window 제한 (모델의 최대 길이에 맞춰 조정)
-        max_context = 4096 - max_tokens
+        max_context = 5000 - max_tokens
         inputs = tokenizer(
             text, return_tensors="pt", truncation=True, max_length=max_context
         ).to(device)
