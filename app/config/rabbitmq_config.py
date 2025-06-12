@@ -1,29 +1,37 @@
 import os
-from typing import List, Dict, Any
 from dotenv import load_dotenv
 
 load_dotenv()
 
-RABBITMQ_HOST = "localhost"  # GCP VM 내부에서 실행 시 localhost, 외부 브로커 사용 시 해당 주소
+# RabbitMQ Server Details (AWS)
+RABBITMQ_HOST = "43.203.77.116"
 RABBITMQ_PORT = 5672
-RABBITMQ_USER = "guest"  # 실제 환경에 맞게 변경
-RABBITMQ_PASSWORD = "guest"  # 실제 환경에 맞게 변경
-RABBITMQ_VIRTUAL_HOST = "/"
+RABBITMQ_USER = os.getenv('RABBITMQ_USER')  
+RABBITMQ_PASSWORD = os.getenv('RABBITMQ_PASSWORD')  
+RABBITMQ_VIRTUAL_HOST = "/" # Usually "/" unless specified otherwise
 
-# 공통으로 사용할 Exchange 설정
-SERVICE_EXCHANGE_NAME = "service_tasks_exchange"
-SERVICE_EXCHANGE_TYPE = "direct" # 라우팅 키 기반으로 특정 큐에 직접 전달
+# --- Quiz Generation Flow ---
 
-# 각 서비스별 라우팅 키 (예시)
-# 실제 서비스 이름에 맞게 정의하여 사용합니다.
-ROUTING_KEY_QUIZ_GENERATOR = "quiz_generator.tasks"
-ROUTING_KEY_STT_FEEDBACK = "stt_feedback.tasks" # STT Feedback 서비스용 라우팅 키 추가
-# 필요에 따라 더 많은 라우팅 키를 추가할 수 있습니다.
+# BE -> AIServer (Request for Quiz Generation)
+QUIZ_REQUEST_EXCHANGE_NAME = "quiz.request.exchange"
+QUIZ_REQUEST_EXCHANGE_TYPE = "direct"  # Or your preferred exchange type
+QUIZ_REQUEST_ROUTING_KEY = "quiz.request.routingKey"
+# Queue for the AIServer worker to consume quiz requests from
+QUIZ_PROCESSING_QUEUE_NAME = "quiz.processing.queue" # Worker consumes from this
 
-# 워커 설정을 위한 추가 값
-PREFETCH_COUNT = 1  # 각 워커가 한 번에 가져올 메시지 수 (환경에 맞게 조절)
+# AIServer -> BE (Response with Generated Quiz)
+QUIZ_RESPONSE_EXCHANGE_NAME = "quiz.response.exchange" # Can be the same as request exchange
+QUIZ_RESPONSE_EXCHANGE_TYPE = "direct" # Or your preferred exchange type
+QUIZ_RESPONSE_ROUTING_KEY = "quiz.response.routingKey" # Routing key for the response
+# Queue for the BE to consume quiz responses from
+QUIZ_RESPONSE_QUEUE_NAME = "quiz.response.queue"    # BE consumes from this
 
-# 각 서비스별 큐 이름
-QUIZ_QUEUE_NAME = "quiz_generation_queue"
+# --- STT Feedback Flow (Keeping existing for now, can be updated similarly if needed) ---
+STT_FEEDBACK_EXCHANGE_NAME = "stt_feedback_exchange" # Example, update as needed
+STT_FEEDBACK_EXCHANGE_TYPE = "direct"
+STT_FEEDBACK_ROUTING_KEY = "stt_feedback.tasks"
 STT_FEEDBACK_QUEUE_NAME = "stt_feedback_queue"
+
+# Common Worker Settings
+PREFETCH_COUNT = 1  # Each worker fetches one message at a time
 
