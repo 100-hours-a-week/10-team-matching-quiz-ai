@@ -1,0 +1,275 @@
+import asyncio
+import json
+import logging
+import time
+
+import aio_pika
+from langfuse import Langfuse
+
+# Configs
+from app.config import rabbitmq_config
+from app.api.quiz_generator.quiz_generator_config import (
+    QUIZ_LANGFUSE_SECRET_KEY,
+    QUIZ_LANGFUSE_PUBLIC_KEY,
+    QUIZ_LANGFUSE_HOST,
+)
+
+# Schema for input and internal data structures
+from app.api.quiz_generator.quiz_generator_schema import FollowupRequest, QuizItem, QuizData
+
+# Core logic components
+from app.vector_db.retriever import quiz_rag_retriever
+from app.api.quiz_generator.quiz_generator_model import generate_quiz
+from app.api.quiz_generator.quiz_generator_parser import (
+    parse_response,
+    filter_and_select_quizzes,
+    remove_prompt_content,
+)
+
+# Setup logging
+logging.basicConfig(
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+)
+logger = logging.getLogger("QuizWorker")
+
+# Initialize Langfuse
+langfuse_client = Langfuse(
+    secret_key=QUIZ_LANGFUSE_SECRET_KEY,
+    public_key=QUIZ_LANGFUSE_PUBLIC_KEY,
+    host=QUIZ_LANGFUSE_HOST,
+    debug=False, # Set to True for more verbose Langfuse logs if needed
+)
+
+async def process_quiz_generation_task(message: aio_pika.IncomingMessage):
+    async with message.process(ignore_processed=True):
+        trace = None  # Initialize trace to None
+        try:
+            logger.info(f"Received message: {message.message_id} for quiz generation.")
+            data = json.loads(message.body.decode())
+            req = FollowupRequest(**data)
+
+            trace = langfuse_client.trace(
+                name="quiz_generation_worker",
+                tags=["quiz", "generate", "worker"],
+                input={"question_list": req.question_history_list, "interview_id": req.interview_id},
+                metadata={"message_id": str(message.message_id), "amqp_timestamp": str(message.timestamp)},
+            )
+            request_start_time = time.time()
+
+            prompt_template_name = "quiz_generation"
+            
+            get_prompt_span = trace.span(name="langfuse_get_prompt_worker")
+            try:
+                # Assuming get_prompt might be blocking
+                prompt_template = await asyncio.to_thread(langfuse_client.get_prompt, prompt_template_name)
+            except Exception as e:
+                logger.error(f"Failed to get Langfuse prompt '{prompt_template_name}': {e}", exc_info=True)
+                get_prompt_span.end(output={"error": str(e)}, status="ERROR")
+                trace.update(status="ERROR", output={"error": f"Failed to get prompt: {e}"})
+                await message.reject(requeue=False)
+                return
+            
+            if prompt_template is None:
+                logger.error(f"Langfuse prompt '{prompt_template_name}' not found.")
+                get_prompt_span.end(output={"error": f"Prompt '{prompt_template_name}' not found"}, status="ERROR")
+                trace.update(status="ERROR", output={"error": f"Prompt '{prompt_template_name}' not found"})
+                await message.reject(requeue=False)
+                return
+            get_prompt_span.end(output={"prompt_name": prompt_template_name, "type": str(type(prompt_template))})
+
+            # RAG
+            rag_span = trace.span(name="rag_retrieval_worker")
+            rag_start_time = time.time()
+            # Assuming quiz_rag_retriever might be blocking
+            quiz_rag_results = await asyncio.to_thread(quiz_rag_retriever, req.question_history_list)
+            related_questions = []
+            if quiz_rag_results: # Ensure quiz_rag_results is not None
+                for rag_result_item in quiz_rag_results:
+                    if rag_result_item and rag_result_item.get("result"):
+                        for doc in rag_result_item["result"]:
+                            if doc and "content" in doc:
+                                related_questions.append(doc["content"])
+            rag_execution_time = time.time() - rag_start_time
+            rag_span.update(
+                input={"question_history_count": len(req.question_history_list)},
+                output={"rag_output_summary": f"{len(quiz_rag_results) if quiz_rag_results else 0} results", "related_questions_count": len(related_questions)},
+                metadata={"execution_time_seconds": rag_execution_time}
+            )
+            rag_span.end()
+
+            joined_questions = "\n".join(req.question_history_list)
+            related_questions_text = "\n".join(related_questions) if related_questions else "관련 문서 없음"
+            
+            context_api = {
+                "joined_questions": joined_questions,
+                "related_questions": related_questions_text,
+            }
+
+            # Prompt Compilation
+            prompt_build_span = trace.span(name="prompt_build_worker")
+            prompt_build_start_time = time.time()
+            if hasattr(prompt_template, "compile"): # Check if it's a compilable prompt object
+                prompt = prompt_template.compile(**context_api)
+            else: # Fallback for string templates or other non-compilable objects
+                prompt_text = prompt_template.prompt if hasattr(prompt_template, "prompt") else str(prompt_template)
+                prompt = prompt_text.replace("{{joined_questions}}", joined_questions)
+                prompt = prompt.replace("{{related_questions}}", related_questions_text)
+            prompt += ("\n--- END OF INSTRUCTION ---")
+            prompt_build_execution_time = time.time() - prompt_build_start_time
+            prompt_build_span.update(
+                input=context_api, # Can be large, consider summarizing
+                output={"compiled_prompt_length": len(prompt)},
+                metadata={"execution_time_seconds": prompt_build_execution_time}
+            )
+            prompt_build_span.end()
+
+            # LLM Generation
+            llm_span = trace.span(name="llm_generation_worker")
+            llm_start_time = time.time()
+            logger.info(f"Calling generate_quiz for interview_id: {req.interview_id}")
+            # generate_quiz is synchronous, run in thread
+            raw_output = await asyncio.to_thread(generate_quiz, prompt, use_chat_template=True)
+            logger.info(f"generate_quiz completed for interview_id: {req.interview_id}")
+            llm_execution_time = time.time() - llm_start_time
+            llm_span.update(
+                input={"prompt_length": len(prompt)},
+                output={"raw_output_length": len(raw_output or "")},
+                metadata={"execution_time_seconds": llm_execution_time}
+            )
+            llm_span.end()
+
+            cleaned_output = remove_prompt_content(raw_output)
+
+            # Parsing
+            parsing_span = trace.span(name="response_parsing_worker")
+            parsing_start_time = time.time()
+            parsed_list = parse_response(cleaned_output)
+            parsing_execution_time = time.time() - parsing_start_time
+            if not parsed_list:
+                logger.error(f"Failed to parse any quizzes for interview_id: {req.interview_id}. Cleaned output: {cleaned_output[:500]}")
+                parsing_span.end(output={"error": "No quizzes parsed", "parsed_count": 0}, metadata={"execution_time_seconds": parsing_execution_time}, status="ERROR")
+                trace.update(status="ERROR", output={"error": "Parsing failed"})
+                await message.reject(requeue=False)
+                return
+            parsing_span.update(
+                input={"cleaned_output_length": len(cleaned_output)},
+                output={"parsed_quiz_count": len(parsed_list)},
+                metadata={"execution_time_seconds": parsing_execution_time}
+            )
+            parsing_span.end()
+            
+            # Filtering
+            filtering_span = trace.span(name="difficulty_filtering_worker")
+            filtering_start_time = time.time()
+            final_quizzes = filter_and_select_quizzes(parsed_list)
+            filtering_execution_time = time.time() - filtering_start_time
+            
+            easy_count = sum(1 for q in parsed_list if q.get("difficulty") == "하")
+            medium_count = sum(1 for q in parsed_list if q.get("difficulty") == "중")
+            hard_count = sum(1 for q in parsed_list if q.get("difficulty") == "상")
+
+            if len(final_quizzes) != 10:
+                error_msg = f"난이도별 문제 부족 - 최종 {len(final_quizzes)}개. 파싱된 문제 중 하:{easy_count}, 중:{medium_count}, 상:{hard_count}"
+                logger.error(f"{error_msg} for interview_id: {req.interview_id}")
+                filtering_span.end(output={"error": error_msg, "final_quiz_count": len(final_quizzes)}, metadata={"execution_time_seconds": filtering_execution_time}, status="ERROR")
+                trace.update(status="ERROR", output={"error": "Filtering failed - insufficient quizzes per difficulty"})
+                await message.reject(requeue=False)
+                return
+            
+            filtering_span.update(
+                input={"parsed_quiz_count": len(parsed_list)},
+                output={"final_quiz_count": len(final_quizzes)},
+                metadata={"execution_time_seconds": filtering_execution_time}
+            )
+            filtering_span.end()
+
+            quiz_items = [QuizItem(**item) for item in final_quizzes] # Validate with Pydantic
+            quiz_data_obj = QuizData(interview_id=req.interview_id, questions=quiz_items)
+            
+            request_execution_time = time.time() - request_start_time
+            trace.update(
+                output={"final_quiz_count": len(quiz_items), "interview_id_processed": quiz_data_obj.interview_id},
+                metadata={"total_execution_time_seconds": request_execution_time}
+            )
+            logger.info(f"Successfully processed quiz generation for interview_id: {req.interview_id}. Generated {len(quiz_items)} quizzes.")
+            logger.info(f"Generated Quiz Data for interview_id {req.interview_id}: {quiz_data_obj.model_dump_json(indent=2)}")
+
+            await message.ack()
+            logger.info(f"Message {message.message_id} acked.")
+
+        except json.JSONDecodeError as e:
+            logger.error(f"JSONDecodeError: {e} for message body: {message.body[:200]}", exc_info=True)
+            if trace: trace.update(status="ERROR", output={"error": f"JSONDecodeError: {str(e)}"})
+            await message.reject(requeue=False)
+        except Exception as e:
+            logger.error(f"Unhandled error processing message {message.message_id if message else 'UnknownMsg'}: {e}", exc_info=True)
+            if trace: trace.update(status="ERROR", output={"error": f"Unhandled error: {str(e)}"})
+            await message.reject(requeue=False)
+
+
+async def main_quiz_worker():
+    connection = None
+    while True:
+        try:
+            connection = await aio_pika.connect_robust(
+                host=rabbitmq_config.RABBITMQ_HOST,
+                port=rabbitmq_config.RABBITMQ_PORT,
+                login=rabbitmq_config.RABBITMQ_USER,
+                password=rabbitmq_config.RABBITMQ_PASSWORD,
+                virtualhost=rabbitmq_config.RABBITMQ_VIRTUAL_HOST,
+                timeout=10,
+                client_properties={'connection_name': 'quiz_worker_connection'}
+            )
+            logger.info("Connected to RabbitMQ.")
+            break 
+        except (aio_pika.exceptions.AMQPConnectionError, ConnectionRefusedError) as e:
+            logger.error(f"RabbitMQ connection failed: {e}. Retrying in 5 seconds...")
+            await asyncio.sleep(5)
+        except Exception as e: # Catch any other unexpected errors during connection
+            logger.error(f"Unexpected error during RabbitMQ connection: {e}. Retrying in 5 seconds...")
+            await asyncio.sleep(5)
+
+    if not connection:
+        logger.critical("Failed to connect to RabbitMQ after multiple retries. Exiting.")
+        return
+
+    async with connection:
+        channel = await connection.channel()
+        await channel.set_qos(prefetch_count=rabbitmq_config.PREFETCH_COUNT or 1)
+
+        exchange_name = rabbitmq_config.SERVICE_EXCHANGE_NAME
+        exchange_type = aio_pika.ExchangeType(rabbitmq_config.SERVICE_EXCHANGE_TYPE)
+        
+        exchange = await channel.declare_exchange(
+            name=exchange_name, type=exchange_type, durable=True
+        )
+
+        queue_name = rabbitmq_config.QUIZ_QUEUE_NAME
+        routing_key = rabbitmq_config.ROUTING_KEY_QUIZ_GENERATOR
+
+        queue = await channel.declare_queue(name=queue_name, durable=True)
+        await queue.bind(exchange, routing_key=routing_key)
+
+        logger.info(f"Waiting for messages on queue '{queue_name}' with routing key '{routing_key}'.")
+        
+        try:
+            async with queue.iterator() as queue_iter:
+                async for message in queue_iter:
+                    await process_quiz_generation_task(message)
+        except asyncio.CancelledError:
+            logger.info("Queue consumption cancelled. Shutting down.")
+        except Exception as e:
+            logger.error(f"Queue consumption error: {e}", exc_info=True)
+        finally:
+            logger.info("Shutting down Quiz Worker.")
+
+if __name__ == "__main__":
+    # Model initialization for quiz_generator is handled by its lazy loading mechanism
+    # when generate_quiz -> get_model is called.
+    logger.info("Starting Quiz Generation Worker...")
+    try:
+        asyncio.run(main_quiz_worker())
+    except KeyboardInterrupt:
+        logger.info("Quiz Generation Worker interrupted by user. Exiting.")
+    except Exception as e:
+        logger.critical(f"Quiz Generation Worker failed to start or run: {e}", exc_info=True)

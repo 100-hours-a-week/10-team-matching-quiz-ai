@@ -1,4 +1,4 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, APIRouter
 from contextlib import asynccontextmanager
 from app.config.model_config import ENVIRONMENT, ENABLED_MODELS
 import logging
@@ -7,9 +7,9 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from enum import Enum
 from datetime import datetime
-from fastapi import APIRouter
 from app.api.question_generator.question_generator_api import router as generate_router
 from app.api.quiz_generator.quiz_generator_api import router as quiz_router
+from app import rabbitmq_producer  # RabbitMQ producer import
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -160,6 +160,8 @@ class ModelManager:
         self._models: Dict[str, BaseModelWrapper] = {
             "question_generator": VLLMModelWrapper("question_generator"),
             "quiz_generator": LazyTransformersModelWrapper("quiz_generator"),
+            # 만약 STT Feedback 모델도 이 ModelManager에서 관리한다면 여기에 추가
+            # "stt_feedback": SomeModelWrapperForSTT("stt_feedback"),
         }
 
     def initialize_immediate_models(self) -> bool:
@@ -207,6 +209,17 @@ async def lifespan(app: FastAPI):
     """애플리케이션 라이프사이클 관리"""
     logger.info(f"애플리케이션 시작 (환경: {ENVIRONMENT})")
 
+    # RabbitMQ 연결 초기화
+    logger.info("RabbitMQ 연결 초기화 시작...")
+    try:
+        await rabbitmq_producer.get_rabbitmq_connection()
+        await rabbitmq_producer.get_rabbitmq_channel()  # 채널 및 Exchange 선언 포함
+        logger.info("RabbitMQ 연결 초기화 완료.")
+    except Exception as e:
+        logger.error(f"RabbitMQ 연결 초기화 실패: {e}")
+        # 중요: 연결 실패 시 애플리케이션을 계속 진행할지, 아니면 중단할지 결정해야 합니다.
+        # 예를 들어, raise RuntimeError("Failed to connect to RabbitMQ, application cannot start.") 로 처리 가능
+
     # 벡터 데이터베이스 초기화
     logger.info("벡터 데이터베이스 초기화 시작...")
     try:
@@ -233,6 +246,15 @@ async def lifespan(app: FastAPI):
 
     logger.info("애플리케이션 종료: 리소스 정리 중...")
     model_manager.cleanup_all_models()
+
+    # RabbitMQ 연결 종료
+    logger.info("RabbitMQ 연결 종료 중...")
+    try:
+        await rabbitmq_producer.close_rabbitmq_connection()
+        logger.info("RabbitMQ 연결 종료 완료.")
+    except Exception as e:
+        logger.error(f"RabbitMQ 연결 종료 실패: {e}")
+
     logger.info("리소스 정리 완료")
 
 
