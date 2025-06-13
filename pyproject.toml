@@ -25,7 +25,6 @@ vllm = "0.8.5.post1"
 # pysqlite3-binary==0.5.4 사용안 할떄는 주석처리 하기
 langchain = "0.3.24"
 boto3 = "^1.34.0"
-bitsandbytes = "0.45.3"
 chromadb = "1.0.7"
 sentence-transformers = "^2.7.0"
 scipy = "^1.13.0"
@@ -72,7 +71,7 @@ tiktoken = "0.9.0"
 pydantic =  "^2.11.3"
 pydub = "^0.25.1" # 음성 파일 처리
 google-generativeai = "^0.8.5"
-whisperx = { git = "https://github.com/m-bain/whisperx.git" }
+whisperx = "3.3.0"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

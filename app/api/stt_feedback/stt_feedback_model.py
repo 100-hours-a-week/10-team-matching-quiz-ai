@@ -6,8 +6,8 @@ class FeedbackItem(BaseModel):
     segment_id: str
     question: str
     model_answer: str
-    feedback: str
-
+    feedback: dict
+    
 # 질문별로 질문, 모범답안, AI 피드백 제공
 class FeedbackResponse(BaseModel):
     feedbackLists: List[FeedbackItem]
