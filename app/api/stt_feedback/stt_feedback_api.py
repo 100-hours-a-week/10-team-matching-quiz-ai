@@ -9,6 +9,17 @@ logger = logging.getLogger("stt")
 
 router = APIRouter()
 
+def format_feedback(feedback_dict: dict) -> str:
+    if not feedback_dict:
+        return ""
+    return (
+        f"{feedback_dict.get('overall_score', '')} 점\n\n"
+        f"{feedback_dict.get('detailed_analysis', '')}\n\n"
+        f"잘한 점: {feedback_dict.get('good_points', '')}\n\n"
+        f"개선할 점: {feedback_dict.get('areas_for_improvement', '')}"
+    )
+
+
 # 피드백 생성
 @router.post("/generate", response_model=FeedbackResponse)
 async def receive_feedback(request: VoiceFeedbackRequest):
@@ -31,12 +42,15 @@ async def receive_feedback(request: VoiceFeedbackRequest):
         question_lists=request.question_lists
     )
 
+    # 변환 적용: feedback dict → string
+    for item in result.feedbackLists:
+        item.feedback = format_feedback(item.feedback)
+
     # pipeline 수행 후 결과 확인
     for idx, item in enumerate(result.feedbackLists):
         logger.info(f"[Feedback Result][{idx+1}] Segment ID: {item.segment_id}")
         logger.info(f"[Feedback Result][{idx+1}] 질문: {item.question}")
         logger.info(f"[Feedback Result][{idx+1}] 질문별 모범답안: {item.model_answer}")
         logger.info(f"[Feedback Result][{idx+1}] 질문별 피드백: {item.feedback}")
-
 
     return result
