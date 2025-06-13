@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger("stt")
 
-router = APIRouter(prefix="/feedback")
+router = APIRouter()
 
 def format_feedback(feedback_dict: dict) -> str:
     if not feedback_dict:
