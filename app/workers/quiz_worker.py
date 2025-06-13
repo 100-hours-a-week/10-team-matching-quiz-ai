@@ -15,7 +15,7 @@ from app.api.quiz_generator.quiz_generator_config import (
 )
 
 # Schema for input and internal data structures
-from app.api.quiz_generator.quiz_generator_schema import FollowupRequest, QuizItem, QuizData
+from app.api.quiz_generator.quiz_generator_schema import FollowupRequest, QuizItem, QuizData, FollowupResponse
 
 # Core logic components
 from app.vector_db.retriever import quiz_rag_retriever
@@ -187,12 +187,14 @@ async def process_quiz_generation_task(message: aio_pika.IncomingMessage):
             quiz_items = [QuizItem(**item) for item in final_quizzes] # Validate with Pydantic
             quiz_data_obj = QuizData(interview_id=req.interview_id, questions=quiz_items)
             
+            response_obj = FollowupResponse(message="Quiz generation completed successfully.",data=quiz_data_obj)
+
             # Publish response back to backend
             response_span = trace.span(name="response_publishing_worker")
             response_start_time = time.time()
             try:
                 response_success = await rabbitmq_producer.publish_response_message(
-                    message_body=quiz_data_obj.model_dump(),
+                    message_body=response_obj.model_dump(),
                     exchange_name=rabbitmq_config.QUIZ_RESPONSE_EXCHANGE_NAME,
                     routing_key=rabbitmq_config.QUIZ_RESPONSE_ROUTING_KEY
                 )
