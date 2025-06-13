@@ -189,6 +189,9 @@ async def process_quiz_generation_task(message: aio_pika.IncomingMessage):
             
             response_obj = FollowupResponse(message="Quiz generation completed successfully.",data=quiz_data_obj)
 
+            logger.info(f"퀴즈 응답 요약] interview_id={req.interview_id}, 퀴즈 수={len(quiz_items)}")
+            logger.debug(f"[전체 응답 내용]: {response_obj}")
+            
             # Publish response back to backend
             response_span = trace.span(name="response_publishing_worker")
             response_start_time = time.time()
