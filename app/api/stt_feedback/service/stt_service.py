@@ -21,13 +21,15 @@ def transcribe_whisperx(segment: AudioSegment) -> str:
             segment.export(tmp.name, format="mp3")
             logger.info(f"[STT] WhisperX VAD 전사 시작: {tmp.name}")
 
-            # VAD 적용한 전사 수행
-            result = WhisperXModel.model.transcribe(
-                tmp.name,
-                vad_filter=True,
-                vad_parameters={"threshold": 0.5}
-            )
+            # Whisper X audio 로딩
+            audio = whisperx.load_audio(tmp.name)
 
+            # VAD 모델 적용 (전역으로 사전 로드됨)
+            vad_segments = WhisperXModel.vad_model(audio)
+
+            # VAD 결과 기반 STT 전사
+            result = WhisperXModel.model.transcribe(audio, vad_segments=vad_segments)
+            
             logger.info(f"[STT] WhisperX 반환 타입: {type(result)}")
             
             # (혹시 리스트라면 바로 리스트 구조 출력)
