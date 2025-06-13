@@ -13,26 +13,26 @@ RABBITMQ_VIRTUAL_HOST = "/"
 
 # BE -> AIServer (Request for Quiz Generation)
 QUIZ_REQUEST_EXCHANGE_NAME = "quiz.request.exchange"
-QUIZ_REQUEST_EXCHANGE_TYPE = "direct"  # Or your preferred exchange type
+QUIZ_REQUEST_EXCHANGE_TYPE = "topic"  # Or your preferred exchange type
 QUIZ_REQUEST_ROUTING_KEY = "quiz.request.routingKey"
 QUIZ_REQUEST_QUEUE_NAME = "quiz.request.queue"    # BE consumes from this
 
 # AIServer -> BE (Response with Generated Quiz)
 QUIZ_RESPONSE_EXCHANGE_NAME = "quiz.response.exchange" # Can be the same as request exchange
-QUIZ_RESPONSE_EXCHANGE_TYPE = "direct" # Or your preferred exchange type
+QUIZ_RESPONSE_EXCHANGE_TYPE = "topic" # Or your preferred exchange type
 QUIZ_RESPONSE_ROUTING_KEY = "quiz.response.routingKey" # Routing key for the response
 # Queue for the BE to consume quiz responses from
 QUIZ_RESPONSE_QUEUE_NAME = "quiz.response.queue"    # BE consumes from this
 
 # --- STT Feedback Flow ---
 STT_FEEDBACK_EXCHANGE_NAME = "stt.feedback.exchange" 
-STT_FEEDBACK_EXCHANGE_TYPE = "direct"
+STT_FEEDBACK_EXCHANGE_TYPE = "topic"
 STT_FEEDBACK_ROUTING_KEY = "stt_feedback.tasks"
 STT_FEEDBACK_QUEUE_NAME = "stt.feedback.queue"
 
 # STT Response Flow (AI Server -> BE)
 STT_RESPONSE_EXCHANGE_NAME = "stt.response.exchange"
-STT_RESPONSE_EXCHANGE_TYPE = "direct"
+STT_RESPONSE_EXCHANGE_TYPE = "topic"
 STT_RESPONSE_ROUTING_KEY = "stt.response.routingKey"
 STT_RESPONSE_QUEUE_NAME = "stt.response.queue"
 
