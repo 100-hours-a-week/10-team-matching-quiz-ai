@@ -339,7 +339,6 @@ async def generate_followup_sync(req: FollowupRequest) -> FollowupResponse: # �
             message="Follow-up questions generated successfully.",
             interview_id=req.interview_id,
             questions=questions[:GENERATE_COUNT], # 최종적으로 GENERATE_COUNT 만큼만 반환
-            trace_id=trace.id if trace else None
         )
 
     except HTTPException as http_exc: # FastAPI의 HTTPException은 그대로 전달
