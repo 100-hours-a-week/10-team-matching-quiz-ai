@@ -29,13 +29,10 @@ async def get_rabbitmq_connection():
                 timeout=10 # 연결 타임아웃 설정 (초 단위)
             )
             logger.info("Successfully connected to RabbitMQ.")
-            # 연결이 끊어졌을 때 재연결 로직을 위한 이벤트 핸들러 (선택 사항)
-            # _connection.add_close_callback(_on_connection_closed)
-            # _connection.add_reconnect_callback(_on_connection_reconnected)
         except Exception as e:
             logger.error(f"Failed to connect to RabbitMQ: {e}")
             _connection = None # 연결 실패 시 None으로 유지
-            raise # 연결 실패 시 예외를 다시 발생시켜 호출 측에서 알 수 있도록 함
+            raise
     return _connection
 
 async def get_rabbitmq_channel():
@@ -53,7 +50,7 @@ async def get_rabbitmq_channel():
         try:
             _channel = await connection.channel()
             logger.info("RabbitMQ channel obtained.")
-            # Exchange 선언 (없으면 생성, idempotent)
+            # Exchange 선언 (없으면 생성, idempotent) -> 내가 생성을 안해도 된다. 
             _exchange = await _channel.declare_exchange(
                 name=rabbitmq_config.SERVICE_EXCHANGE_NAME,
                 type=aio_pika.ExchangeType(rabbitmq_config.SERVICE_EXCHANGE_TYPE), # aio_pika.ExchangeType 사용

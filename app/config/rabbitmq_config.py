@@ -7,7 +7,7 @@ RABBITMQ_HOST = "43.203.77.116"
 RABBITMQ_PORT = 5672
 RABBITMQ_USER = os.getenv('RABBITMQ_USER')  
 RABBITMQ_PASSWORD = os.getenv('RABBITMQ_PASSWORD')  
-RABBITMQ_VIRTUAL_HOST = "/" # Usually "/" unless specified otherwise
+RABBITMQ_VIRTUAL_HOST = "/"
 
 # --- Quiz Generation Flow ---
 
