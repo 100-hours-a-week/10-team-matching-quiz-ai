@@ -2,34 +2,20 @@ import asyncio
 import json
 import logging
 import time
+from typing import Optional
 
 import aio_pika
-
-import asyncio
-import json
-import logging
-import time
-
-import aio_pika
-
-import asyncio
-import json
-import logging
-import time
-
-import aio_pika
+from aio_pika.exceptions import AMQPConnectionError
 
 # Configs
 from app.config import rabbitmq_config
 
 # Schema for input
 from app.api.stt_feedback.stt_feedback_schema import VoiceFeedbackRequest
-# Schema for output (if the worker produces a specific structure to be stored/sent elsewhere)
-# from app.api.stt_feedback.stt_feedback_model import FeedbackResponse # Or similar
 
 # Core logic components
 from app.api.stt_feedback.service.feedback_pipline import run_feedback_pipeline
-from app.api.stt_feedback.stt_model_loader import load_whisperx_model, get_whisperx_model
+from app.api.stt_feedback.stt_model_loader import WhisperXModel
 from app import rabbitmq_producer
 
 # Setup logging
@@ -37,6 +23,7 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("STTFeedbackWorker")
+
 
 async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
     async with message.process(ignore_processed=True):
@@ -47,35 +34,39 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
 
             request_start_time = time.time()
 
-            # Ensure WhisperX model is loaded (it's loaded on app startup in main_stt_feedback.py, 
-            # but worker is separate process, so needs its own loading if not shared or pre-loaded)
-            # For simplicity, assuming get_whisperx_model() checks and loads if necessary, or it was loaded at worker start.
-            if get_whisperx_model() is None:
+            # WhisperX 모델 확인 (실제 구현에 맞게 수정)
+            if WhisperXModel.model is None:  # is_loaded() 대신 직접 모델 체크
                 logger.info("WhisperX model not loaded. Attempting to load...")
-                load_whisperx_model() # This should ideally be done once at worker startup
-                if get_whisperx_model() is None:
+                WhisperXModel.ensure_loaded()
+                if WhisperXModel.model is None:  # 로드 후 다시 체크
                     logger.error("Failed to load WhisperX model in worker.")
-                    await message.reject(requeue=False) # Do not requeue if model can't load
+                    await message.reject(requeue=False)
                     return
                 logger.info("WhisperX model loaded successfully in worker.")
 
+
             pipeline_start_time = time.time()
 
-            logger.info(f"Running feedback pipeline for interview_id: {req.interview_id}")
+            logger.info(f"Running feedback pipeline for recording URL: {req.recording_url}")
             # run_feedback_pipeline is synchronous, run in thread
             feedback_result = await asyncio.to_thread(
                 run_feedback_pipeline,
-                interview_id=req.interview_id,
-                recording_url=req.recording_url,
-                questionLists=[q.model_dump(by_alias=True) for q in req.questionLists]
+                recording_url=str(req.recording_url),
+                question_lists=req.question_lists
             )
-            logger.info(f"Feedback pipeline completed for interview_id: {req.interview_id}")
+            logger.info(f"Feedback pipeline completed for recording URL: {req.recording_url}")
             
             pipeline_execution_time = time.time() - pipeline_start_time
-
             request_execution_time = time.time() - request_start_time
             
-            logger.info(f"Successfully processed STT feedback for interview_id: {req.interview_id}.")
+            logger.info(
+                f"Performance metrics - Recording URL: {req.recording_url}, "
+                f"Pipeline time: {pipeline_execution_time:.2f}s, "
+                f"Total time: {request_execution_time:.2f}s, "
+                f"Questions processed: {len(req.question_lists)}"
+            )
+            
+            logger.info(f"Successfully processed STT feedback for recording: {req.recording_url}")
             
             # Send response back to backend if feedback_result exists
             if feedback_result:
@@ -86,39 +77,50 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
                         routing_key=rabbitmq_config.STT_RESPONSE_ROUTING_KEY
                     )
                     if response_success:
-                        logger.info(f"Successfully published STT response for interview_id: {req.interview_id}")
+                        logger.info(f"Successfully published STT response for recording: {req.recording_url}")
                     else:
-                        logger.error(f"Failed to publish STT response for interview_id: {req.interview_id}")
+                        logger.error(f"Failed to publish STT response for recording: {req.recording_url}")
                 except Exception as e:
-                    logger.error(f"Error publishing STT response for interview_id: {req.interview_id}: {e}")
+                    logger.error(f"Error publishing STT response for recording {req.recording_url}: {e}")
             
-            logger.info(f"Generated STT Feedback for interview_id {req.interview_id}: {feedback_result.model_dump_json(indent=2) if feedback_result else 'None'}")
+            logger.info(f"Generated STT Feedback: {feedback_result.model_dump_json(indent=2) if feedback_result else 'None'}")
 
             await message.ack()
             logger.info(f"Message {message.message_id} acked.")
 
         except json.JSONDecodeError as e:
             logger.error(f"JSONDecodeError: {e} for message body: {message.body[:200]}", exc_info=True)
-            await message.reject(requeue=False) # Do not requeue malformed messages
+            await message.reject(requeue=False)  # Do not requeue malformed messages
         except Exception as e:
             logger.error(f"Unhandled error processing message {message.message_id if message else 'UnknownMsg'}: {e}", exc_info=True)
             await message.reject(requeue=False)
 
+
 async def main_stt_feedback_worker():
     # Load models once at startup
     logger.info("STT Feedback Worker: Initializing WhisperX model...")
-    try:
-        load_whisperx_model()
-        if get_whisperx_model() is not None:
-            logger.info("STT Feedback Worker: WhisperX model loaded successfully.")
-        else:
-            logger.error("STT Feedback Worker: Failed to load WhisperX model during startup. Worker might not function correctly.")
-            # Depending on severity, you might want to exit or retry
-    except Exception as e:
-        logger.error(f"STT Feedback Worker: Error loading WhisperX model during startup: {e}", exc_info=True)
+    max_retries = getattr(rabbitmq_config, 'MODEL_LOAD_MAX_RETRIES', 3)
+    
+    for attempt in range(max_retries):
+        try:
+            WhisperXModel.ensure_loaded()
+            if WhisperXModel.model is not None:  # is_loaded() 대신 직접 모델 체크
+                logger.info("STT Feedback Worker: WhisperX model loaded successfully.")
+                break
+            else:
+                logger.warning(f"Model load attempt {attempt + 1} failed.")
+        except Exception as e:
+            logger.error(f"Model load attempt {attempt + 1} error: {e}")
+            if attempt == max_retries - 1:
+                logger.critical("Failed to load model after all retries. Exiting.")
+                return
+            await asyncio.sleep(5)
 
     connection = None
-    while True:
+    retry_count = 0
+    max_connection_retries = getattr(rabbitmq_config, 'MAX_CONNECTION_RETRIES', 10)
+    
+    while retry_count < max_connection_retries:
         try:
             connection = await aio_pika.connect_robust(
                 host=rabbitmq_config.RABBITMQ_HOST,
@@ -132,10 +134,12 @@ async def main_stt_feedback_worker():
             logger.info("Connected to RabbitMQ.")
             break
         except (aio_pika.exceptions.AMQPConnectionError, ConnectionRefusedError) as e:
-            logger.error(f"RabbitMQ connection failed: {e}. Retrying in 5 seconds...")
+            retry_count += 1
+            logger.error(f"RabbitMQ connection failed (attempt {retry_count}/{max_connection_retries}): {e}. Retrying in 5 seconds...")
             await asyncio.sleep(5)
         except Exception as e:
-            logger.error(f"Unexpected error during RabbitMQ connection: {e}. Retrying in 5 seconds...")
+            retry_count += 1
+            logger.error(f"Unexpected error during RabbitMQ connection (attempt {retry_count}/{max_connection_retries}): {e}. Retrying in 5 seconds...")
             await asyncio.sleep(5)
     
     if not connection:
@@ -144,7 +148,7 @@ async def main_stt_feedback_worker():
 
     async with connection:
         channel = await connection.channel()
-        await channel.set_qos(prefetch_count=rabbitmq_config.PREFETCH_COUNT or 1) # Use prefetch from config or default
+        await channel.set_qos(prefetch_count=getattr(rabbitmq_config, 'PREFETCH_COUNT', 1))
 
         exchange_name = rabbitmq_config.SERVICE_EXCHANGE_NAME
         exchange_type = aio_pika.ExchangeType(rabbitmq_config.SERVICE_EXCHANGE_TYPE)
@@ -171,6 +175,7 @@ async def main_stt_feedback_worker():
             logger.error(f"Queue consumption error: {e}", exc_info=True)
         finally:
             logger.info("Shutting down STT Feedback Worker.")
+
 
 if __name__ == "__main__":
     logger.info("Starting STT Feedback Worker...")

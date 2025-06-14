@@ -24,16 +24,16 @@ QUIZ_RESPONSE_ROUTING_KEY = "quiz.response.routingKey"
 QUIZ_RESPONSE_QUEUE_NAME = "quiz.response.queue"    
 
 # --- STT Feedback Flow ---
-STT_FEEDBACK_EXCHANGE_NAME = "stt.feedback.exchange" 
-STT_FEEDBACK_EXCHANGE_TYPE = "topic"
-STT_FEEDBACK_ROUTING_KEY = "stt_feedback.tasks"
-STT_FEEDBACK_QUEUE_NAME = "stt.feedback.queue"
+STT_FEEDBACK_EXCHANGE_NAME = "stt.request.exchange"  # 이름들을 수정해야한다. 
+STT_FEEDBACK_EXCHANGE_TYPE = "topic" 
+STT_FEEDBACK_ROUTING_KEY = "stt_feedback.tasks" # 이름들을 수정해야한다. 
+STT_FEEDBACK_QUEUE_NAME = "stt.request.queue" # 이름들을 수정해야한다. 
 
 # STT Response Flow (AI Server -> BE)
-STT_RESPONSE_EXCHANGE_NAME = "stt.response.exchange"
+STT_RESPONSE_EXCHANGE_NAME = "stt.response.exchange" # 이름들을 수정해야한다. 
 STT_RESPONSE_EXCHANGE_TYPE = "topic"
-STT_RESPONSE_ROUTING_KEY = "stt.response.routingKey"
-STT_RESPONSE_QUEUE_NAME = "stt.response.queue"
+STT_RESPONSE_ROUTING_KEY = "stt.response.routingKey" # 이름들을 수정해야한다. 
+STT_RESPONSE_QUEUE_NAME = "stt.response.queue" # 이름들을 수정해야한다. 
 
 # --- Missing Constants Referenced by Workers ---
 # Use quiz.request.exchange as the main service exchange for now
