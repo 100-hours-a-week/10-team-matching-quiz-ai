@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from app.api.stt_feedback.stt_feedback_model import FeedbackResponse
 from app.api.stt_feedback.service.feedback_pipline import run_feedback_pipeline
 from app.api.stt_feedback.stt_feedback_schema import VoiceFeedbackRequest
@@ -8,6 +8,15 @@ import logging
 logger = logging.getLogger("stt")
 
 router = APIRouter()
+
+# POST를 제외한 요청 시 
+@router.api_route("/generate", methods=["GET", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
+async def block_non_post_generate(request: Request):
+    raise HTTPException(
+        status_code=405,
+        detail=f"Method {request.method} not allowed. POST 요청만 지원하고 있습니다."
+    )
+
 
 def format_feedback(feedback_dict: dict) -> str:
     if not feedback_dict:
