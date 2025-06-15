@@ -55,7 +55,6 @@ def generate_feedback_gemini(question: str, answer: str) -> dict:
     try:
         model = genai.GenerativeModel(
             "gemini-1.0-pro", # 또는 'gemini-1.5-pro' 사용도 가능 - OAuth 필요
-            api_key=GEMINI_API_KEY,
             generation_config=genai.GenerationConfig(
                 temperature=0.7, # 창의성 조절. 피드백에 맞춤
                 response_mime_type="application/json", # JSON 형식 강제
