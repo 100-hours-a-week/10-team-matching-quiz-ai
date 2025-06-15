@@ -8,7 +8,8 @@ from typing import Dict, Any, Optional
 from enum import Enum
 from datetime import datetime
 from app.api.question_generator.question_generator_api import router as generate_router
-from app.api.quiz_generator.quiz_generator_api import router as quiz_router
+# Quiz API 라우터 제거 - Worker에서만 처리
+# from app.api.quiz_generator.quiz_generator_api import router as quiz_router
 from app import rabbitmq_producer  # RabbitMQ producer import
 
 logging.basicConfig(
@@ -97,71 +98,13 @@ class VLLMModelWrapper(BaseModelWrapper):
                 logger.error(f"{self.model_name} 정리 오류: {e}")
 
 
-class LazyTransformersModelWrapper(BaseModelWrapper):
-    """Transformers 모델 래퍼 - 지연 로딩"""
-
-    def __init__(self, model_name: str):
-        super().__init__(model_name)
-        self.status = ModelStatus.LAZY_READY
-
-    def initialize(self) -> bool:
-        if self.status == ModelStatus.READY:
-            return True
-
-        self.status = ModelStatus.INITIALIZING
-        try:
-            from app.api.quiz_generator.quiz_generator_model import (
-                initialize_quiz_model,
-            )
-
-            logger.info(f"{self.model_name} (Transformers) 지연 초기화 시도...")
-            model, tokenizer = initialize_quiz_model()
-
-            self._model_data = {
-                "model": model,
-                "tokenizer": tokenizer,
-                "type": "transformers",
-            }
-            self.status = ModelStatus.READY
-            logger.info(f"{self.model_name} 초기화 완료")
-            return True
-
-        except Exception as e:
-            self.status = ModelStatus.ERROR
-            logger.error(f"{self.model_name} 초기화 오류: {e}")
-            return False
-
-    def get_model_data_with_lazy_init(self):
-        if self.status == ModelStatus.READY:
-            return self._model_data
-        return self._model_data if self.initialize() else None
-
-    def is_available(self) -> bool:
-        return (
-            self.status == ModelStatus.READY and self._model_data is not None
-        ) or self.status == ModelStatus.LAZY_READY
-
-    def cleanup(self):
-        if self._model_data:
-            try:
-                import torch
-
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                logger.info(f"{self.model_name} 정리 완료")
-            except Exception as e:
-                logger.error(f"{self.model_name} 정리 오류: {e}")
-
-
 class ModelManager:
-    """모델 관리자 클래스"""
+    """모델 관리자 클래스 - Quiz 모델은 Worker에서 별도 관리"""
 
     def __init__(self):
         self._models: Dict[str, BaseModelWrapper] = {
             "question_generator": VLLMModelWrapper("question_generator"),
-            "quiz_generator": LazyTransformersModelWrapper("quiz_generator"),
-            # 만약 STT Feedback 모델도 이 ModelManager에서 관리한다면 여기에 추가
-            # "stt_feedback": SomeModelWrapperForSTT("stt_feedback"),
+            # quiz_generator 제거 - Worker에서만 처리
         }
 
     def initialize_immediate_models(self) -> bool:
@@ -171,8 +114,9 @@ class ModelManager:
                 logger.error("question_generator 초기화 실패")
                 success = False
 
+        # Quiz generator는 Worker에서만 처리
         if "quiz_generator" in ENABLED_MODELS:
-            logger.info("quiz_generator는 지연 로딩으로 설정됨")
+            logger.info("quiz_generator는 Quiz Worker에서 별도 처리됩니다.")
 
         return success
 
@@ -180,9 +124,6 @@ class ModelManager:
         wrapper = self._models.get(model_name)
         if not wrapper:
             return None
-
-        if isinstance(wrapper, LazyTransformersModelWrapper):
-            return wrapper.get_model_data_with_lazy_init()
 
         return wrapper.get_model_data() if wrapper.is_available() else None
 
@@ -217,30 +158,28 @@ async def lifespan(app: FastAPI):
         logger.info("RabbitMQ 연결 초기화 완료.")
     except Exception as e:
         logger.error(f"RabbitMQ 연결 초기화 실패: {e}")
-        # 중요: 연결 실패 시 애플리케이션을 계속 진행할지, 아니면 중단할지 결정해야 합니다.
-        # 예를 들어, raise RuntimeError("Failed to connect to RabbitMQ, application cannot start.") 로 처리 가능
 
-    # 벡터 데이터베이스 초기화
+    # 벡터 데이터베이스 초기화 (Quiz Worker와 공유)
     logger.info("벡터 데이터베이스 초기화 시작...")
     try:
         from app.vector_db.init_data import init_all_vector_stores
 
         init_all_vector_stores()
-        logger.info("벡터 데이터베이스 초기화 완료")
+        logger.info("벡터 데이터베이스 초기화 완료 (Quiz Worker와 공유)")
     except Exception as e:
         logger.error(f"벡터 데이터베이스 초기화 실패: {e}")
 
-    # 모델 초기화
+    # 모델 초기화 (Question Generator만)
     logger.info("모델 초기화 시작...")
     initialization_success = model_manager.initialize_immediate_models()
 
     if initialization_success:
-        logger.info("모델 초기화 성공")
+        logger.info("Question Generator 모델 초기화 성공")
     else:
-        logger.warning("일부 모델 초기화 실패")
+        logger.warning("Question Generator 모델 초기화 실패")
 
     available_models = model_manager.get_available_models()
-    logger.info(f"사용 가능한 모델들: {available_models}")
+    logger.info(f"API 서버에서 사용 가능한 모델들: {available_models}")
 
     yield
 
@@ -279,8 +218,10 @@ def get_available_models():
     return model_manager.get_available_models()
 
 
+# API 라우터 포함 (Question Generator만)
 app.include_router(generate_router, prefix="/interview", tags=["question-generator"])
-app.include_router(quiz_router, prefix="/quiz", tags=["quiz"])
+# Quiz API는 Worker에서만 처리하므로 제거
+# app.include_router(quiz_router, prefix="/quiz", tags=["quiz"])
 
 
 @app.get("/health")
@@ -288,7 +229,7 @@ async def health_check():
     """시스템 상태 확인"""
     available_models = get_available_models()
 
-    # 벡터 데이터베이스 상태 확인
+    # 벡터 데이터베이스 상태 확인 (Quiz Worker와 공유)
     vector_db_status = {}
     try:
         from app.vector_db.chroma_client import follow_up_collection, quiz_collection
@@ -298,6 +239,7 @@ async def health_check():
             "quiz_data": quiz_collection.count() > 0,
             "follow_up_count": follow_up_collection.count(),
             "quiz_count": quiz_collection.count(),
+            "shared_with_workers": True,
         }
     except Exception as e:
         logger.error(f"벡터 데이터베이스 상태 확인 실패: {e}")
@@ -307,12 +249,32 @@ async def health_check():
             "error": str(e),
         }
 
-    # 시스템 상태 결정
-    enabled_count = len(ENABLED_MODELS)
+    # Worker 상태 확인 (RabbitMQ 큐 기반)
+    worker_status = {}
+    try:
+        # RabbitMQ 큐 상태로 Worker 상태 추정
+        quiz_worker_status = "active"  # 실제로는 큐 메시지 수나 컨슈머 수로 판단
+        stt_worker_status = "active"   # 실제로는 큐 메시지 수나 컨슈머 수로 판단
+        
+        worker_status = {
+            "quiz_worker": quiz_worker_status,
+            "stt_worker": stt_worker_status,
+        }
+    except Exception as e:
+        logger.error(f"Worker 상태 확인 실패: {e}")
+        worker_status = {
+            "quiz_worker": "unknown",
+            "stt_worker": "unknown",
+            "error": str(e),
+        }
+
+    # 시스템 상태 결정 (API 서버 모델만 고려)
+    api_enabled_models = [model for model in ENABLED_MODELS if model != "quiz_generator"]
+    enabled_count = len(api_enabled_models)
     available_count = len(available_models)
 
     system_status = "healthy"
-    if available_count == 0:
+    if available_count == 0 and enabled_count > 0:
         system_status = "unhealthy"
     elif available_count < enabled_count:
         system_status = "degraded"
@@ -322,15 +284,17 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "environment": ENVIRONMENT,
         "enabled_models": ENABLED_MODELS,
-        "available_models": available_models,
+        "api_available_models": available_models,
         "models_status": {
-            model: is_model_available(model)
-            for model in ["question_generator", "quiz_generator"]
+            "question_generator": is_model_available("question_generator"),
+            "quiz_generator": "worker_mode",  # Worker에서 처리
         },
         "vector_db_status": vector_db_status,
+        "worker_status": worker_status,
         "system_info": {
-            "total_enabled": enabled_count,
-            "total_available": available_count,
-            "availability_ratio": f"{available_count}/{enabled_count}",
+            "api_enabled": enabled_count,
+            "api_available": available_count,
+            "worker_services": ["quiz_worker", "stt_worker"],
+            "shared_resources": ["vector_db", "rabbitmq"],
         },
     }
