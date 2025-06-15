@@ -7,7 +7,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# 전역 변수로 모델과 토크나이저 선언 (지연 로딩을 위해)
+# 전역 변수로 모델과 토크나이저 선언 (Worker 전용)
 model = None
 tokenizer = None
 device = None
@@ -15,14 +15,14 @@ dtype = None
 
 
 def initialize_quiz_model():
-    """퀴즈 생성 모델을 지연 초기화하는 함수"""
+    """퀴즈 생성 모델을 초기화하는 함수 (Worker 전용)"""
     global model, tokenizer, device, dtype
 
     if model is not None and tokenizer is not None:
-        logger.info("Quiz model already initialized")
+        logger.info("Quiz model already initialized in worker")
         return model, tokenizer
 
-    logger.info("Initializing quiz generation model...")
+    logger.info("Initializing quiz generation model in worker...")
 
     try:
         # 디바이스 및 dtype 설정
@@ -59,26 +59,26 @@ def initialize_quiz_model():
             load_in_4bit=True
         ).to(device)
 
-        logger.info("Quiz model initialized successfully")
+        logger.info("Quiz model initialized successfully in worker")
         return model, tokenizer
 
     except Exception as e:
-        logger.error(f"Failed to initialize quiz model: {str(e)}")
+        logger.error(f"Failed to initialize quiz model in worker: {str(e)}")
         raise
 
 
 def generate_quiz(prompt: str, max_tokens: int = 4096, use_chat_template: bool = False) -> str:
-    """퀴즈 생성 함수 - 모델 관리자를 통해 접근"""
+    """퀴즈 생성 함수 (Worker 전용 - 직접 모델 접근)"""
+    global model, tokenizer
+    
     try:
-        # 모델 관리자를 통해 모델 데이터 가져오기 (지연 로딩 지원)
-        from app.main import get_model
-
-        model_data = get_model("quiz_generator")
-        if not model_data:
-            raise RuntimeError("quiz_generator 모델을 로드할 수 없습니다.")
-
-        model = model_data["model"]
-        tokenizer = model_data["tokenizer"]
+        # Worker에서는 직접 전역 모델 사용
+        if model is None or tokenizer is None:
+            logger.info("Model not loaded, initializing...")
+            initialize_quiz_model()
+            
+        if model is None or tokenizer is None:
+            raise RuntimeError("퀴즈 생성 모델을 로드할 수 없습니다.")
 
         use_chat_template = True
 
@@ -93,7 +93,7 @@ def generate_quiz(prompt: str, max_tokens: int = 4096, use_chat_template: bool =
         else:
             text = prompt
 
-        logger.info("Starting quiz generation...")
+        logger.info("Starting quiz generation in worker...")
         logger.debug(f"Input prompt length: {len(prompt)} characters")
 
         # 토큰 수 확인
@@ -109,7 +109,7 @@ def generate_quiz(prompt: str, max_tokens: int = 4096, use_chat_template: bool =
             text, return_tensors="pt", truncation=True, max_length=max_context
         ).to(device)
 
-        logger.info("Generating quiz content...")
+        logger.info("Generating quiz content in worker...")
 
         # 모델 생성 파라미터 최적화
         output = model.generate(
@@ -125,44 +125,45 @@ def generate_quiz(prompt: str, max_tokens: int = 4096, use_chat_template: bool =
 
         # 디코딩
         decoded = tokenizer.decode(output[0], skip_special_tokens=True)
-        logger.info("Quiz generation completed successfully")
+        logger.info("Quiz generation completed successfully in worker")
 
         return decoded
 
     except Exception as e:
-        logger.error(f"Error during quiz generation: {str(e)}")
+        logger.error(f"Error during quiz generation in worker: {str(e)}")
         raise
 
 
 def cleanup_quiz_model():
-    """모델 메모리 정리"""
+    """모델 메모리 정리 (Worker 전용)"""
     global model, tokenizer, device, dtype
 
     try:
         if model is not None:
             del model
             model = None
-            logger.info("Quiz model memory cleaned up")
+            logger.info("Quiz model memory cleaned up in worker")
 
         if tokenizer is not None:
             del tokenizer
             tokenizer = None
-            logger.info("Tokenizer memory cleaned up")
+            logger.info("Tokenizer memory cleaned up in worker")
 
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
-            logger.info("CUDA cache cleared")
+            logger.info("CUDA cache cleared in worker")
 
     except Exception as e:
-        logger.error(f"Error during cleanup: {str(e)}")
+        logger.error(f"Error during cleanup in worker: {str(e)}")
 
 
 def get_model_status():
-    """모델 상태 정보 반환"""
+    """모델 상태 정보 반환 (Worker 전용)"""
     return {
         "model_loaded": model is not None,
         "tokenizer_loaded": tokenizer is not None,
         "device": device,
         "dtype": str(dtype) if dtype else None,
         "model_name": QUIZ_MODEL_NAME,
+        "mode": "worker"
     }
