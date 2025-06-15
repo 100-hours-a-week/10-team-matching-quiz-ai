@@ -1,7 +1,10 @@
+from dotenv import load_dotenv # .env 파일 추가
 from fastapi import FastAPI
 from app.api.stt_feedback.stt_feedback_api import router as feedback_router
 from app.api.stt_feedback.stt_model_loader import WhisperXModel
 import logging
+
+load_dotenv()
 
 logging.basicConfig(
     level=logging.INFO,
