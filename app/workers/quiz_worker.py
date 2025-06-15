@@ -109,18 +109,37 @@ async def process_quiz_generation_task(message: aio_pika.IncomingMessage):
             # Prompt Compilation
             prompt_build_span = trace.span(name="prompt_build_worker")
             prompt_build_start_time = time.time()
+            
             if hasattr(prompt_template, "compile"): # Check if it's a compilable prompt object
                 prompt = prompt_template.compile(**context_api)
+                compilation_method = "langfuse_compile"
             else: # Fallback for string templates or other non-compilable objects
                 prompt_text = prompt_template.prompt if hasattr(prompt_template, "prompt") else str(prompt_template)
                 prompt = prompt_text.replace("{{joined_questions}}", joined_questions)
                 prompt = prompt.replace("{{related_questions}}", related_questions_text)
+                compilation_method = "string_replacement"
+            
             prompt += ("\n--- END OF INSTRUCTION ---")
             prompt_build_execution_time = time.time() - prompt_build_start_time
+            
+            # 더 상세한 prompt 추적 (question_generator_api 스타일)
             prompt_build_span.update(
-                input=context_api, # Can be large, consider summarizing
-                output={"compiled_prompt_length": len(prompt)},
-                metadata={"execution_time_seconds": prompt_build_execution_time}
+                input={
+                    "context_api": context_api,
+                    "joined_questions_length": len(joined_questions),
+                    "related_questions_count": len(related_questions),
+                    "template_type": str(type(prompt_template)),
+                    "compilation_method": compilation_method
+                },
+                output={
+                    "compiled_prompt": prompt,
+                    "compiled_prompt_length": len(prompt),
+                    "final_prompt_preview": prompt[:200] + "..." if len(prompt) > 200 else prompt
+                },
+                metadata={
+                    "execution_time_seconds": prompt_build_execution_time,
+                    "interview_id": req.interview_id
+                }
             )
             prompt_build_span.end()
 
@@ -128,14 +147,32 @@ async def process_quiz_generation_task(message: aio_pika.IncomingMessage):
             llm_span = trace.span(name="llm_generation_worker")
             llm_start_time = time.time()
             logger.info(f"Calling generate_quiz for interview_id: {req.interview_id}")
+            
             # generate_quiz is synchronous, run in thread
             raw_output = await asyncio.to_thread(generate_quiz, prompt, use_chat_template=True)
+            
             logger.info(f"generate_quiz completed for interview_id: {req.interview_id}")
             llm_execution_time = time.time() - llm_start_time
+            
+            # Langfuse에 상세한 input/output 추적 (question_generator_api 스타일)
             llm_span.update(
-                input={"prompt_length": len(prompt)},
-                output={"raw_output_length": len(raw_output or "")},
-                metadata={"execution_time_seconds": llm_execution_time}
+                input={
+                    "prompt": prompt,
+                    "prompt_length": len(prompt),
+                    "use_chat_template": True,
+                    "interview_id": req.interview_id,
+                    "model_type": "transformers"
+                },
+                output={
+                    "raw_response": raw_output,
+                    "raw_output_length": len(raw_output or ""),
+                    "generation_successful": raw_output is not None and len(raw_output.strip()) > 0
+                },
+                metadata={
+                    "execution_time_seconds": llm_execution_time,
+                    "worker_name": "quiz_worker",
+                    "function_called": "generate_quiz"
+                }
             )
             llm_span.end()
 
@@ -146,16 +183,46 @@ async def process_quiz_generation_task(message: aio_pika.IncomingMessage):
             parsing_start_time = time.time()
             parsed_list = parse_response(cleaned_output)
             parsing_execution_time = time.time() - parsing_start_time
+            
             if not parsed_list:
                 logger.error(f"Failed to parse any quizzes for interview_id: {req.interview_id}. Cleaned output: {cleaned_output[:500]}")
-                parsing_span.end(output={"error": "No quizzes parsed", "parsed_count": 0}, metadata={"execution_time_seconds": parsing_execution_time}, status="ERROR")
+                parsing_span.end(
+                    input={
+                        "cleaned_output": cleaned_output,
+                        "cleaned_output_length": len(cleaned_output),
+                        "cleaned_output_preview": cleaned_output[:500] + "..." if len(cleaned_output) > 500 else cleaned_output
+                    },
+                    output={
+                        "error": "No quizzes parsed", 
+                        "parsed_count": 0,
+                        "parsing_successful": False
+                    }, 
+                    metadata={
+                        "execution_time_seconds": parsing_execution_time,
+                        "interview_id": req.interview_id
+                    }, 
+                    status="ERROR"
+                )
                 trace.update(status="ERROR", output={"error": "Parsing failed"})
                 await message.reject(requeue=False)
                 return
+            
+            # 성공적인 파싱의 경우 상세 정보 추적
             parsing_span.update(
-                input={"cleaned_output_length": len(cleaned_output)},
-                output={"parsed_quiz_count": len(parsed_list)},
-                metadata={"execution_time_seconds": parsing_execution_time}
+                input={
+                    "cleaned_output": cleaned_output,
+                    "cleaned_output_length": len(cleaned_output),
+                    "raw_output_length": len(raw_output or "")
+                },
+                output={
+                    "parsed_quiz_count": len(parsed_list),
+                    "parsing_successful": True,
+                    "parsed_quizzes_sample": parsed_list[:2] if len(parsed_list) >= 2 else parsed_list  # 처음 2개 예시
+                },
+                metadata={
+                    "execution_time_seconds": parsing_execution_time,
+                    "interview_id": req.interview_id
+                }
             )
             parsing_span.end()
             
@@ -172,15 +239,52 @@ async def process_quiz_generation_task(message: aio_pika.IncomingMessage):
             if len(final_quizzes) != 10:
                 error_msg = f"난이도별 문제 부족 - 최종 {len(final_quizzes)}개. 파싱된 문제 중 하:{easy_count}, 중:{medium_count}, 상:{hard_count}"
                 logger.error(f"{error_msg} for interview_id: {req.interview_id}")
-                filtering_span.end(output={"error": error_msg, "final_quiz_count": len(final_quizzes)}, metadata={"execution_time_seconds": filtering_execution_time}, status="ERROR")
+                filtering_span.end(
+                    input={
+                        "parsed_list": parsed_list,
+                        "parsed_quiz_count": len(parsed_list),
+                        "difficulty_distribution": {
+                            "easy": easy_count,
+                            "medium": medium_count,
+                            "hard": hard_count
+                        }
+                    },
+                    output={
+                        "error": error_msg, 
+                        "final_quiz_count": len(final_quizzes),
+                        "filtering_successful": False
+                    }, 
+                    metadata={
+                        "execution_time_seconds": filtering_execution_time,
+                        "interview_id": req.interview_id,
+                        "target_quiz_count": 10
+                    }, 
+                    status="ERROR"
+                )
                 trace.update(status="ERROR", output={"error": "Filtering failed - insufficient quizzes per difficulty"})
                 await message.reject(requeue=False)
                 return
             
+            # 성공적인 필터링의 경우
             filtering_span.update(
-                input={"parsed_quiz_count": len(parsed_list)},
-                output={"final_quiz_count": len(final_quizzes)},
-                metadata={"execution_time_seconds": filtering_execution_time}
+                input={
+                    "parsed_quiz_count": len(parsed_list),
+                    "difficulty_distribution": {
+                        "easy": easy_count,
+                        "medium": medium_count,
+                        "hard": hard_count
+                    }
+                },
+                output={
+                    "final_quiz_count": len(final_quizzes),
+                    "filtering_successful": True,
+                    "final_quizzes_sample": final_quizzes[:2] if len(final_quizzes) >= 2 else final_quizzes  # 처음 2개 예시
+                },
+                metadata={
+                    "execution_time_seconds": filtering_execution_time,
+                    "interview_id": req.interview_id,
+                    "target_quiz_count": 10
+                }
             )
             filtering_span.end()
 
