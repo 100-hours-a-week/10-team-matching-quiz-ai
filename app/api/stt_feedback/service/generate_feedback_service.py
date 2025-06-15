@@ -51,9 +51,9 @@ def generate_feedback_gemini(question: str, answer: str) -> dict:
     logger.info(f"[LLM] Gemini 피드백 + 모범답안 생성 시작 (모델: gemini-1.5-pro)")
     try:
         model = genai.GenerativeModel(
-            "gemini-1.5-pro", # 또는 'gemini-1.0-pro'를 사용할 수도 있습니다.
+            "gemini-1.0-pro", # 또는 'gemini-1.5-pro' 사용도 가능 - OAuth 필요
             generation_config=genai.GenerationConfig(
-                temperature=0.7, # 창의성 조절. 피드백에는 너무 높지 않은 값이 좋습니다.
+                temperature=0.7, # 창의성 조절. 피드백에 맞춤
                 response_mime_type="application/json", # JSON 형식 강제
             ),
             safety_settings={ # 안전 설정, 필요에 따라 조정 가능
@@ -68,7 +68,7 @@ def generate_feedback_gemini(question: str, answer: str) -> dict:
         logger.info(f"[LLM] 생성 완료")
 
         # JSON 응답 파싱
-        # response_mime_type="application/json"을 사용했으므로 response.text는 유효한 JSON 문자열이어야 합니다.
+        # response_mime_type="application/json"을 사용했으므로 response.text는 유효한 JSON 문자열
         json_response = json.loads(response.text)
 
         # 필요한 정보 추출 및 반환
