@@ -12,7 +12,10 @@ if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY 환경변수가 설정되지 않았습니다.")
 
 # 최신 버전용 초기화 (0.8.x 이상)
-genai.configure(api_key=GEMINI_API_KEY)
+genai.configure(
+    api_key=GEMINI_API_KEY,
+    api_endpoint="https://generativelanguage.googleapis.com/v1"
+)
 
 # LLM 프롬프트 고도화 및 Gemini 피드백 생성
 def generate_feedback_gemini(question: str, answer: str) -> dict:
