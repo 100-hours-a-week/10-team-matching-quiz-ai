@@ -4,12 +4,15 @@ import google.generativeai as genai
 from google.generativeai.types import HarmCategory, HarmBlockThreshold
 import json # JSON 응답 파싱을 위해 import
 
-logger = logging.getLogger("stt") # 로거 이름은 프로젝트 구조에 따라 변경 가능
+logger = logging.getLogger("stt")
 
 # Gemini API 키 설정
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+if not GEMINI_API_KEY:
+    raise ValueError("GEMINI_API_KEY 환경변수가 설정되지 않았습니다.")
 
-# LLM 프롬프트 고도화 및 Gemini 피드백 생성 함수
+
+# LLM 프롬프트 고도화 및 Gemini 피드백 생성
 def generate_feedback_gemini(question: str, answer: str) -> dict:
     # 프롬프트: '신입 백엔드 개발자' 면접관 역할을 명확히 하고, 상세한 JSON 출력을 요구합니다.
     prompt = f"""
@@ -52,6 +55,7 @@ def generate_feedback_gemini(question: str, answer: str) -> dict:
     try:
         model = genai.GenerativeModel(
             "gemini-1.0-pro", # 또는 'gemini-1.5-pro' 사용도 가능 - OAuth 필요
+            api_key=GEMINI_API_KEY,
             generation_config=genai.GenerationConfig(
                 temperature=0.7, # 창의성 조절. 피드백에 맞춤
                 response_mime_type="application/json", # JSON 형식 강제
