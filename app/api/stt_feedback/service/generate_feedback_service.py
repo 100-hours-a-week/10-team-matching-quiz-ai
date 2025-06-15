@@ -11,6 +11,8 @@ GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 if not GEMINI_API_KEY:
     raise ValueError("GEMINI_API_KEY 환경변수가 설정되지 않았습니다.")
 
+# 최신 버전용 초기화 (0.8.x 이상)
+genai.configure(api_key=GEMINI_API_KEY)
 
 # LLM 프롬프트 고도화 및 Gemini 피드백 생성
 def generate_feedback_gemini(question: str, answer: str) -> dict:
@@ -54,7 +56,7 @@ def generate_feedback_gemini(question: str, answer: str) -> dict:
     logger.info(f"[LLM] Gemini 피드백 + 모범답안 생성 시작 (모델: gemini-1.5-pro)")
     try:
         model = genai.GenerativeModel(
-            "gemini-1.0-pro", # 또는 'gemini-1.5-pro' 사용도 가능 - OAuth 필요
+            "gemini-1.5-pro", # 또는 'gemini-1.0-pro' 사용 가능 
             generation_config=genai.GenerationConfig(
                 temperature=0.7, # 창의성 조절. 피드백에 맞춤
                 response_mime_type="application/json", # JSON 형식 강제
@@ -71,7 +73,6 @@ def generate_feedback_gemini(question: str, answer: str) -> dict:
         logger.info(f"[LLM] 생성 완료")
 
         # JSON 응답 파싱
-        # response_mime_type="application/json"을 사용했으므로 response.text는 유효한 JSON 문자열
         json_response = json.loads(response.text)
 
         # 필요한 정보 추출 및 반환
