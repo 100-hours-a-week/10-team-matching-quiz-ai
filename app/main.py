@@ -9,7 +9,6 @@ from enum import Enum
 from datetime import datetime
 from fastapi import APIRouter
 from app.api.question_generator.question_generator_api import router as generate_router
-from app.api.quiz_generator.quiz_generator_api import router as quiz_router
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -97,69 +96,12 @@ class VLLMModelWrapper(BaseModelWrapper):
                 logger.error(f"{self.model_name} 정리 오류: {e}")
 
 
-class LazyTransformersModelWrapper(BaseModelWrapper):
-    """Transformers 모델 래퍼 - 지연 로딩"""
-
-    def __init__(self, model_name: str):
-        super().__init__(model_name)
-        self.status = ModelStatus.LAZY_READY
-
-    def initialize(self) -> bool:
-        if self.status == ModelStatus.READY:
-            return True
-
-        self.status = ModelStatus.INITIALIZING
-        try:
-            from app.api.quiz_generator.quiz_generator_model import (
-                initialize_quiz_model,
-            )
-
-            logger.info(f"{self.model_name} (Transformers) 지연 초기화 시도...")
-            model, tokenizer = initialize_quiz_model()
-
-            self._model_data = {
-                "model": model,
-                "tokenizer": tokenizer,
-                "type": "transformers",
-            }
-            self.status = ModelStatus.READY
-            logger.info(f"{self.model_name} 초기화 완료")
-            return True
-
-        except Exception as e:
-            self.status = ModelStatus.ERROR
-            logger.error(f"{self.model_name} 초기화 오류: {e}")
-            return False
-
-    def get_model_data_with_lazy_init(self):
-        if self.status == ModelStatus.READY:
-            return self._model_data
-        return self._model_data if self.initialize() else None
-
-    def is_available(self) -> bool:
-        return (
-            self.status == ModelStatus.READY and self._model_data is not None
-        ) or self.status == ModelStatus.LAZY_READY
-
-    def cleanup(self):
-        if self._model_data:
-            try:
-                import torch
-
-                if torch.cuda.is_available():
-                    torch.cuda.empty_cache()
-                logger.info(f"{self.model_name} 정리 완료")
-            except Exception as e:
-                logger.error(f"{self.model_name} 정리 오류: {e}")
-
-
 class ModelManager:
     """모델 관리자 클래스"""
 
     def __init__(self):
         self._models: Dict[str, BaseModelWrapper] = {
             "question_generator": VLLMModelWrapper("question_generator"),
-            "quiz_generator": LazyTransformersModelWrapper("quiz_generator"),
         }
 
     def initialize_immediate_models(self) -> bool:
@@ -169,18 +111,12 @@ class ModelManager:
                 logger.error("question_generator 초기화 실패")
                 success = False
 
-        if "quiz_generator" in ENABLED_MODELS:
-            logger.info("quiz_generator는 지연 로딩으로 설정됨")
-
         return success
 
     def get_model(self, model_name: str) -> Optional[Any]:
         wrapper = self._models.get(model_name)
         if not wrapper:
             return None
-
-        if isinstance(wrapper, LazyTransformersModelWrapper):
-            return wrapper.get_model_data_with_lazy_init()
 
         return wrapper.get_model_data() if wrapper.is_available() else None
 
@@ -258,7 +194,6 @@ def get_available_models():
 
 
 app.include_router(generate_router, prefix="/interview", tags=["question-generator"])
-app.include_router(quiz_router, prefix="/quiz", tags=["quiz"])
 
 
 @app.get("/health")
@@ -302,8 +237,7 @@ async def health_check():
         "enabled_models": ENABLED_MODELS,
         "available_models": available_models,
         "models_status": {
-            model: is_model_available(model)
-            for model in ["question_generator", "quiz_generator"]
+            "question_generator": is_model_available("question_generator")
         },
         "vector_db_status": vector_db_status,
         "system_info": {
