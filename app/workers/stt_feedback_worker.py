@@ -25,6 +25,47 @@ logging.basicConfig(
 logger = logging.getLogger("STTFeedbackWorker")
 
 
+def format_feedback(feedback_dict: dict) -> str:
+    """피드백 딕셔너리를 문자열로 포맷팅"""
+    if not feedback_dict:
+        return ""
+    return (
+        f"{feedback_dict.get('overall_score', '')} 점\n\n"
+        f"{feedback_dict.get('detailed_analysis', '')}\n\n"
+        f"잘한 점: {feedback_dict.get('good_points', '')}\n\n"
+        f"개선할 점: {feedback_dict.get('areas_for_improvement', '')}"
+    )
+
+
+def parse_and_format_response(result) -> dict:
+    """결과를 파싱하고 포맷팅하여 최종 응답 생성"""
+    
+    # 변환 적용: feedback dict → string
+    for item in result.feedbackLists:
+        item.feedback = format_feedback(item.feedback)
+
+    # pipeline 수행 후 결과 로깅
+    for idx, item in enumerate(result.feedbackLists):
+        logger.info(f"[Feedback Result][{idx+1}] Segment ID: {item.segment_id}")
+        logger.info(f"[Feedback Result][{idx+1}] 질문: {item.question}")
+        logger.info(f"[Feedback Result][{idx+1}] 질문별 모범답안: {item.model_answer}")
+        logger.info(f"[Feedback Result][{idx+1}] 질문별 피드백: {item.feedback}")
+        
+    # 응답 데이터 생성 (question 제외)
+    response = result.model_dump()
+    response['feedbackLists'] = [
+        {
+            "segment_id": item["segment_id"],
+            "model_answer": item["model_answer"], 
+            "feedback": item["feedback"]
+            # question 필드는 의도적으로 제외
+        }
+        for item in response['feedbackLists']
+    ]
+
+    return response
+
+
 async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
     async with message.process(ignore_processed=True):
         try:
@@ -48,6 +89,10 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
             pipeline_start_time = time.time()
 
             logger.info(f"Running feedback pipeline for recording URL: {req.recording_url}")
+            
+            for idx, q in enumerate(req.question_lists):
+                logger.info(f"[Worker] 질문 {idx+1}: {q.question} (start: {q.start_time}, end: {q.end_time})")
+            
             # run_feedback_pipeline is synchronous, run in thread
             feedback_result = await asyncio.to_thread(
                 run_feedback_pipeline,
@@ -71,8 +116,11 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
             # Send response back to backend if feedback_result exists
             if feedback_result:
                 try:
+                    # 응답 파싱 및 포맷팅 적용
+                    formatted_response = parse_and_format_response(feedback_result)
+                    
                     response_success = await rabbitmq_producer.publish_response_message(
-                        message_body=feedback_result.model_dump(),
+                        message_body=formatted_response,
                         exchange_name=rabbitmq_config.STT_RESPONSE_EXCHANGE_NAME,
                         routing_key=rabbitmq_config.STT_RESPONSE_ROUTING_KEY
                     )
@@ -83,7 +131,7 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
                 except Exception as e:
                     logger.error(f"Error publishing STT response for recording {req.recording_url}: {e}")
             
-            logger.info(f"Generated STT Feedback: {feedback_result.model_dump_json(indent=2) if feedback_result else 'None'}")
+            logger.info(f"Generated STT Feedback: {formatted_response if 'formatted_response' in locals() else 'None'}")
 
             await message.ack()
             logger.info(f"Message {message.message_id} acked.")
