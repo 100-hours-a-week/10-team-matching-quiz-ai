@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.config.model_config import ENVIRONMENT, ENABLED_MODELS
 import logging
@@ -7,7 +7,9 @@ from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional
 from enum import Enum
 from datetime import datetime
+from fastapi import APIRouter
 from app.api.question_generator.question_generator_api import router as generate_router
+from app.api.quiz_generator.quiz_generator_api import router as quiz_router
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -20,6 +22,7 @@ logger.info(f"활성화된 모델들: {ENABLED_MODELS}")
 
 class ModelType(Enum):
     VLLM = "vllm"
+    TRANSFORMERS = "transformers"
 
 
 class ModelStatus(Enum):
@@ -53,83 +56,131 @@ class BaseModelWrapper(ABC):
         return self._model_data
 
 
-class VLLMApiWrapper(BaseModelWrapper):
-    """vLLM API 래퍼 - HTTP API 호출 방식"""
+class VLLMModelWrapper(BaseModelWrapper):
+    """vLLM 모델 래퍼 - 즉시 로딩"""
 
     def initialize(self) -> bool:
         self.status = ModelStatus.INITIALIZING
         try:
-            # vLLM API 서버 상태 확인
-            import asyncio
-            from app.api.question_generator.question_generator_model_api import check_vllm_api_health
-            
-            logger.info(f"{self.model_name} (vLLM API) 연결 확인 중...")
-            
-            try:
-                # 현재 실행 중인 이벤트 루프가 있는지 확인
-                try:
-                    loop = asyncio.get_running_loop()
-                    # 이미 실행 중인 루프가 있다면 task로 실행
-                    import concurrent.futures
-                    with concurrent.futures.ThreadPoolExecutor() as executor:
-                        future = executor.submit(asyncio.run, check_vllm_api_health())
-                        is_healthy = future.result(timeout=30)
-                except RuntimeError:
-                    # 실행 중인 루프가 없다면 새로 생성
-                    is_healthy = asyncio.run(check_vllm_api_health())
-                
-                if is_healthy:
-                    self._model_data = "vllm_api_client"  # API 클라이언트 표시용
+            if ENVIRONMENT.startswith("gcp-"):
+                os.environ["VLLM_GPU_MEMORY_UTILIZATION"] = "0.7"
+                os.environ["VLLM_MAX_MODEL_LEN"] = "2048"
+
+            from app.api.question_generator.question_generator_model import (
+                initialize_llm,
+                get_llm_engine,
+            )
+
+            logger.info(f"{self.model_name} (vLLM) 초기화 시도...")
+            if initialize_llm():
+                current_engine = get_llm_engine()
+                if current_engine:
+                    self._model_data = current_engine
                     self.status = ModelStatus.READY
-                    logger.info(f"{self.model_name} API 연결 성공")
+                    logger.info(f"{self.model_name} 초기화 완료")
                     return True
-                else:
-                    self.status = ModelStatus.ERROR
-                    logger.error(f"{self.model_name} API 서버에 연결할 수 없습니다")
-                    return False
-            except Exception as e:
-                self.status = ModelStatus.ERROR
-                logger.error(f"{self.model_name} API 연결 중 오류: {e}")
-                return False
+
+            self.status = ModelStatus.ERROR
+            return False
 
         except Exception as e:
             self.status = ModelStatus.ERROR
-            logger.error(f"{self.model_name} API 연결 오류: {e}")
+            logger.error(f"{self.model_name} 초기화 오류: {e}")
             return False
 
     def cleanup(self):
-        """vLLM API 클라이언트 정리"""
+        if self._model_data and hasattr(self._model_data, "shutdown_background_loop"):
+            try:
+                self._model_data.shutdown_background_loop()
+                logger.info(f"{self.model_name} 정리 완료")
+            except Exception as e:
+                logger.error(f"{self.model_name} 정리 오류: {e}")
+
+
+class LazyTransformersModelWrapper(BaseModelWrapper):
+    """Transformers 모델 래퍼 - 지연 로딩"""
+
+    def __init__(self, model_name: str):
+        super().__init__(model_name)
+        self.status = ModelStatus.LAZY_READY
+
+    def initialize(self) -> bool:
+        if self.status == ModelStatus.READY:
+            return True
+
+        self.status = ModelStatus.INITIALIZING
         try:
-            if self._model_data:
-                logger.info(f"{self.model_name} API 연결 정리 중...")
-                self._model_data = None
-                self.status = ModelStatus.UNINITIALIZED
-                logger.info(f"{self.model_name} API 연결 정리 완료")
+            from app.api.quiz_generator.quiz_generator_model import (
+                initialize_quiz_model,
+            )
+
+            logger.info(f"{self.model_name} (Transformers) 지연 초기화 시도...")
+            model, tokenizer = initialize_quiz_model()
+
+            self._model_data = {
+                "model": model,
+                "tokenizer": tokenizer,
+                "type": "transformers",
+            }
+            self.status = ModelStatus.READY
+            logger.info(f"{self.model_name} 초기화 완료")
+            return True
+
         except Exception as e:
-            logger.error(f"{self.model_name} API 정리 중 오류: {e}")
+            self.status = ModelStatus.ERROR
+            logger.error(f"{self.model_name} 초기화 오류: {e}")
+            return False
+
+    def get_model_data_with_lazy_init(self):
+        if self.status == ModelStatus.READY:
+            return self._model_data
+        return self._model_data if self.initialize() else None
+
+    def is_available(self) -> bool:
+        return (
+            self.status == ModelStatus.READY and self._model_data is not None
+        ) or self.status == ModelStatus.LAZY_READY
+
+    def cleanup(self):
+        if self._model_data:
+            try:
+                import torch
+
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
+                logger.info(f"{self.model_name} 정리 완료")
+            except Exception as e:
+                logger.error(f"{self.model_name} 정리 오류: {e}")
 
 
 class ModelManager:
-    """Question Generator API 모델 관리자 클래스"""
+    """모델 관리자 클래스"""
 
     def __init__(self):
         self._models: Dict[str, BaseModelWrapper] = {
-            "question_generator": VLLMApiWrapper("question_generator"),
+            "question_generator": VLLMModelWrapper("question_generator"),
+            "quiz_generator": LazyTransformersModelWrapper("quiz_generator"),
         }
 
-    def initialize_models(self) -> bool:
-        """활성화된 모델들을 초기화"""
+    def initialize_immediate_models(self) -> bool:
         success = True
         if "question_generator" in ENABLED_MODELS:
             if not self._models["question_generator"].initialize():
-                logger.error("question_generator API 연결 실패")
+                logger.error("question_generator 초기화 실패")
                 success = False
+
+        if "quiz_generator" in ENABLED_MODELS:
+            logger.info("quiz_generator는 지연 로딩으로 설정됨")
+
         return success
 
     def get_model(self, model_name: str) -> Optional[Any]:
         wrapper = self._models.get(model_name)
         if not wrapper:
             return None
+
+        if isinstance(wrapper, LazyTransformersModelWrapper):
+            return wrapper.get_model_data_with_lazy_init()
 
         return wrapper.get_model_data() if wrapper.is_available() else None
 
@@ -166,17 +217,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"벡터 데이터베이스 초기화 실패: {e}")
 
-    # Question Generator API 초기화
-    logger.info("Question Generator API 연결 확인...")
-    initialization_success = model_manager.initialize_models()
+    # 모델 초기화
+    logger.info("모델 초기화 시작...")
+    initialization_success = model_manager.initialize_immediate_models()
 
     if initialization_success:
-        logger.info("Question Generator API 연결 성공")
+        logger.info("모델 초기화 성공")
     else:
-        logger.warning("Question Generator API 연결 실패")
+        logger.warning("일부 모델 초기화 실패")
 
     available_models = model_manager.get_available_models()
-    logger.info(f"API 서버에서 사용 가능한 모델들: {available_models}")
+    logger.info(f"사용 가능한 모델들: {available_models}")
 
     yield
 
@@ -186,9 +237,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Team Matching Quiz AI - Question Generator API",
-    description=f"vLLM OpenAI 호환 API 기반 질문 생성 서비스\n환경: {ENVIRONMENT}",
-    version="2.0.0",
+    title="Team Matching Quiz AI",
+    description=f"AI 기반 팀 매칭 퀴즈 시스템\n환경: {ENVIRONMENT}\n활성화된 모델: {', '.join(ENABLED_MODELS)}",
+    version="1.0.0",
     lifespan=lifespan,
 )
 
@@ -206,8 +257,8 @@ def get_available_models():
     return model_manager.get_available_models()
 
 
-# API 라우터 포함
 app.include_router(generate_router, prefix="/interview", tags=["question-generator"])
+app.include_router(quiz_router, prefix="/quiz", tags=["quiz"])
 
 
 @app.get("/health")
@@ -239,7 +290,7 @@ async def health_check():
     available_count = len(available_models)
 
     system_status = "healthy"
-    if available_count == 0 and enabled_count > 0:
+    if available_count == 0:
         system_status = "unhealthy"
     elif available_count < enabled_count:
         system_status = "degraded"
@@ -248,17 +299,16 @@ async def health_check():
         "status": system_status,
         "timestamp": datetime.now().isoformat(),
         "environment": ENVIRONMENT,
-        "service": "question-generator-api",
-        "architecture": "vllm_openai_compatible_api",
         "enabled_models": ENABLED_MODELS,
         "available_models": available_models,
         "models_status": {
-            "question_generator": is_model_available("question_generator"),
+            model: is_model_available(model)
+            for model in ["question_generator", "quiz_generator"]
         },
         "vector_db_status": vector_db_status,
         "system_info": {
-            "enabled": enabled_count,
-            "available": available_count,
-            "version": "2.0.0",
+            "total_enabled": enabled_count,
+            "total_available": available_count,
+            "availability_ratio": f"{available_count}/{enabled_count}",
         },
     }
