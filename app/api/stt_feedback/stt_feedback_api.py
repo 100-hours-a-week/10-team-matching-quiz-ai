@@ -7,14 +7,17 @@ import logging
 
 logger = logging.getLogger("stt")
 
-router = APIRouter()
+router = APIRouter(
+    prefix="/feedback",
+    tags=["stt-feedback"]
+)
 
 # POST를 제외한 요청 시 
 @router.api_route("/generate", methods=["GET", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
 async def block_non_post_generate(request: Request):
     raise HTTPException(
         status_code=405,
-        detail=f"Method {request.method} not allowed. POST 요청만 지원하고 있습니다."
+        detail=f"Method {request.method} not allowed. POST 만"
     )
 
 
@@ -30,7 +33,7 @@ def format_feedback(feedback_dict: dict) -> str:
 
 
 # 피드백 생성
-@router.post("/generate", response_model=FeedbackResponse)
+@router.post("/generate")
 async def receive_feedback(request: VoiceFeedbackRequest):
     
     logger.info(f"[API 요청] audio file 링크(S3): {request.recording_url}")
@@ -61,5 +64,15 @@ async def receive_feedback(request: VoiceFeedbackRequest):
         logger.info(f"[Feedback Result][{idx+1}] 질문: {item.question}")
         logger.info(f"[Feedback Result][{idx+1}] 질문별 모범답안: {item.model_answer}")
         logger.info(f"[Feedback Result][{idx+1}] 질문별 피드백: {item.feedback}")
+        
+    response = result.model_dump()
+    response['feedbackLists'] = [
+        {
+            "segment_id": item["segment_id"],
+            "model_answer": item["model_answer"],
+            "feedback": item["feedback"]
+        }
+        for item in response['feedbackLists']
+    ]
 
-    return result
+    return response

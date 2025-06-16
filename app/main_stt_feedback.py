@@ -12,7 +12,7 @@ logging.basicConfig(
 )
 
 app = FastAPI()
-app.include_router(feedback_router, prefix="/feedback", tags=["stt-feedback"])
+app.include_router(feedback_router)
 
 
 @app.on_event("startup")
