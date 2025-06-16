@@ -57,67 +57,60 @@ class BaseModelWrapper(ABC):
         return self._model_data
 
 
-class VLLMModelWrapper(BaseModelWrapper):
-    """vLLM 모델 래퍼 - 즉시 로딩"""
+class VLLMApiWrapper(BaseModelWrapper):
+    """vLLM API 래퍼 - HTTP API 호출 방식"""
 
     def initialize(self) -> bool:
         self.status = ModelStatus.INITIALIZING
         try:
-            if ENVIRONMENT.startswith("gcp-"):
-                os.environ["VLLM_GPU_MEMORY_UTILIZATION"] = "0.7"
-                os.environ["VLLM_MAX_MODEL_LEN"] = "2048"
-
-            from app.api.question_generator.question_generator_model import (
-                initialize_llm,
-                get_llm_engine,
-            )
-
-            logger.info(f"{self.model_name} (vLLM) 초기화 시도...")
-            if initialize_llm():
-                current_engine = get_llm_engine()
-                if current_engine:
-                    self._model_data = current_engine
+            # vLLM API 서버 상태 확인
+            import asyncio
+            from app.api.question_generator.question_generator_model_api import check_vllm_api_health
+            
+            logger.info(f"{self.model_name} (vLLM API) 연결 확인 중...")
+            
+            # 비동기 함수를 동기적으로 실행
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                is_healthy = loop.run_until_complete(check_vllm_api_health())
+                if is_healthy:
+                    self._model_data = "vllm_api_client"  # API 클라이언트 표시용
                     self.status = ModelStatus.READY
-                    logger.info(f"{self.model_name} 초기화 완료")
+                    logger.info(f"{self.model_name} API 연결 성공")
                     return True
-
-            self.status = ModelStatus.ERROR
-            return False
+                else:
+                    self.status = ModelStatus.ERROR
+                    logger.error(f"{self.model_name} API 서버에 연결할 수 없습니다")
+                    return False
+            finally:
+                loop.close()
 
         except Exception as e:
             self.status = ModelStatus.ERROR
-            logger.error(f"{self.model_name} 초기화 오류: {e}")
+            logger.error(f"{self.model_name} API 연결 오류: {e}")
             return False
 
     def cleanup(self):
-        if self._model_data and hasattr(self._model_data, "shutdown_background_loop"):
-            try:
-                self._model_data.shutdown_background_loop()
-                logger.info(f"{self.model_name} 정리 완료")
-            except Exception as e:
-                logger.error(f"{self.model_name} 정리 오류: {e}")
+        # API 클라이언트는 별도 정리가 필요 없음
+        logger.info(f"{self.model_name} API 클라이언트 정리 완료")
 
 
 class ModelManager:
-    """모델 관리자 클래스 - Quiz 모델은 Worker에서 별도 관리"""
+    """Question Generator API 모델 관리자 클래스"""
 
     def __init__(self):
         self._models: Dict[str, BaseModelWrapper] = {
-            "question_generator": VLLMModelWrapper("question_generator"),
-            # quiz_generator 제거 - Worker에서만 처리
+            "question_generator": VLLMApiWrapper("question_generator"),
         }
 
-    def initialize_immediate_models(self) -> bool:
+    def initialize_models(self) -> bool:
+        """활성화된 모델들을 초기화"""
         success = True
         if "question_generator" in ENABLED_MODELS:
             if not self._models["question_generator"].initialize():
-                logger.error("question_generator 초기화 실패")
+                logger.error("question_generator API 연결 실패")
                 success = False
-
-        # Quiz generator는 Worker에서만 처리
-        if "quiz_generator" in ENABLED_MODELS:
-            logger.info("quiz_generator는 Quiz Worker에서 별도 처리됩니다.")
-
         return success
 
     def get_model(self, model_name: str) -> Optional[Any]:
@@ -169,14 +162,14 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"벡터 데이터베이스 초기화 실패: {e}")
 
-    # 모델 초기화 (Question Generator만)
-    logger.info("모델 초기화 시작...")
-    initialization_success = model_manager.initialize_immediate_models()
+    # Question Generator API 초기화
+    logger.info("Question Generator API 연결 확인...")
+    initialization_success = model_manager.initialize_models()
 
     if initialization_success:
-        logger.info("Question Generator 모델 초기화 성공")
+        logger.info("Question Generator API 연결 성공")
     else:
-        logger.warning("Question Generator 모델 초기화 실패")
+        logger.warning("Question Generator API 연결 실패")
 
     available_models = model_manager.get_available_models()
     logger.info(f"API 서버에서 사용 가능한 모델들: {available_models}")
@@ -198,9 +191,9 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="Team Matching Quiz AI",
-    description=f"AI 기반 팀 매칭 퀴즈 시스템\n환경: {ENVIRONMENT}\n활성화된 모델: {', '.join(ENABLED_MODELS)}",
-    version="1.0.0",
+    title="Team Matching Quiz AI - Question Generator API",
+    description=f"vLLM OpenAI 호환 API 기반 질문 생성 서비스\n환경: {ENVIRONMENT}\n활성화된 모델: {', '.join(ENABLED_MODELS)}",
+    version="2.0.0",
     lifespan=lifespan,
 )
 
@@ -279,22 +272,21 @@ async def health_check():
     elif available_count < enabled_count:
         system_status = "degraded"
 
-    return {
+        return {
         "status": system_status,
         "timestamp": datetime.now().isoformat(),
         "environment": ENVIRONMENT,
+        "service": "question-generator-api",
+        "architecture": "vllm_openai_compatible_api",
         "enabled_models": ENABLED_MODELS,
-        "api_available_models": available_models,
+        "available_models": available_models,
         "models_status": {
             "question_generator": is_model_available("question_generator"),
-            "quiz_generator": "worker_mode",  # Worker에서 처리
         },
         "vector_db_status": vector_db_status,
-        "worker_status": worker_status,
         "system_info": {
-            "api_enabled": enabled_count,
-            "api_available": available_count,
-            "worker_services": ["quiz_worker", "stt_worker"],
-            "shared_resources": ["vector_db", "rabbitmq"],
+            "enabled": enabled_count,
+            "available": available_count,
+            "version": "2.0.0",
         },
     }
