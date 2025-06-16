@@ -2,14 +2,12 @@
 import os
 from typing import List
 from dotenv import load_dotenv
+from app.config.model_config import VLLM_CONFIG
 
 load_dotenv()
 
 # Hugging Face 설정
 HF_TOKEN = os.getenv("HF_TOKEN", "")
-
-# 모델 설정
-MODEL_PATH = os.getenv("LLM_MODEL_PATH", "TommyKong/gemma-3-finetune-4bit")
 
 # OpenAI API 설정
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
@@ -21,11 +19,11 @@ LANGFUSE_CONFIG = {
     "host": os.getenv("LANGFUSE_HOST"),
 }
 
-# vLLM OpenAI 호환 API 서버 설정
+# vLLM OpenAI 호환 API 서버 설정 (model_config.py의 VLLM_CONFIG 활용)
 VLLM_API_CONFIG = {
     "base_url": os.getenv("VLLM_API_BASE_URL", "http://localhost:8001/v1"),
     "api_key": os.getenv("VLLM_API_KEY", "EMPTY"),  # vLLM 서버에서는 보통 "EMPTY" 사용
-    "model_name": os.getenv("VLLM_MODEL_NAME", "TommyKong/gemma-3-finetune-4bit"),
+    "model_name": VLLM_CONFIG["model_path"],  # model_config.py에서 가져옴 (Hugging Face 모델명)
     "timeout": float(os.getenv("VLLM_API_TIMEOUT", "60.0")),
 }
 
