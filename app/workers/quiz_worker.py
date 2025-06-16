@@ -91,10 +91,28 @@ async def process_quiz_generation_task(message: aio_pika.IncomingMessage):
                             if doc and "content" in doc:
                                 related_questions.append(doc["content"])
             rag_execution_time = time.time() - rag_start_time
+            
+            # RAG 결과를 더 상세하게 Langfuse에 추적
             rag_span.update(
-                input={"question_history_count": len(req.question_history_list)},
-                output={"rag_output_summary": f"{len(quiz_rag_results) if quiz_rag_results else 0} results", "related_questions_count": len(related_questions)},
-                metadata={"execution_time_seconds": rag_execution_time}
+                input={
+                    "question_history_list": req.question_history_list,
+                    "question_history_count": len(req.question_history_list),
+                    "search_method": "quiz_rag_retriever",
+                    "retrieval_type": "vector_similarity"
+                },
+                output={
+                    "rag_results_count": len(quiz_rag_results) if quiz_rag_results else 0,
+                    "related_questions": related_questions,
+                    "related_questions_count": len(related_questions),
+                    "retrieved_documents": quiz_rag_results if quiz_rag_results else [],
+                    "retrieval_successful": quiz_rag_results is not None and len(related_questions) > 0
+                },
+                metadata={
+                    "execution_time_seconds": rag_execution_time,
+                    "collection_name": "quiz_collection",
+                    "interview_id": req.interview_id,
+                    "worker_type": "quiz_worker"
+                }
             )
             rag_span.end()
 
