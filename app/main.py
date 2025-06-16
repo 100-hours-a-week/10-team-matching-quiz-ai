@@ -8,9 +8,6 @@ from typing import Dict, Any, Optional
 from enum import Enum
 from datetime import datetime
 from app.api.question_generator.question_generator_api import router as generate_router
-# Quiz API 라우터 제거 - Worker에서만 처리
-# from app.api.quiz_generator.quiz_generator_api import router as quiz_router
-from app import rabbitmq_producer  # RabbitMQ producer import
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
@@ -23,7 +20,6 @@ logger.info(f"활성화된 모델들: {ENABLED_MODELS}")
 
 class ModelType(Enum):
     VLLM = "vllm"
-    TRANSFORMERS = "transformers"
 
 
 class ModelStatus(Enum):
@@ -69,11 +65,19 @@ class VLLMApiWrapper(BaseModelWrapper):
             
             logger.info(f"{self.model_name} (vLLM API) 연결 확인 중...")
             
-            # 비동기 함수를 동기적으로 실행
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
             try:
-                is_healthy = loop.run_until_complete(check_vllm_api_health())
+                # 현재 실행 중인 이벤트 루프가 있는지 확인
+                try:
+                    loop = asyncio.get_running_loop()
+                    # 이미 실행 중인 루프가 있다면 task로 실행
+                    import concurrent.futures
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(asyncio.run, check_vllm_api_health())
+                        is_healthy = future.result(timeout=30)
+                except RuntimeError:
+                    # 실행 중인 루프가 없다면 새로 생성
+                    is_healthy = asyncio.run(check_vllm_api_health())
+                
                 if is_healthy:
                     self._model_data = "vllm_api_client"  # API 클라이언트 표시용
                     self.status = ModelStatus.READY
@@ -83,8 +87,10 @@ class VLLMApiWrapper(BaseModelWrapper):
                     self.status = ModelStatus.ERROR
                     logger.error(f"{self.model_name} API 서버에 연결할 수 없습니다")
                     return False
-            finally:
-                loop.close()
+            except Exception as e:
+                self.status = ModelStatus.ERROR
+                logger.error(f"{self.model_name} API 연결 중 오류: {e}")
+                return False
 
         except Exception as e:
             self.status = ModelStatus.ERROR
@@ -92,8 +98,15 @@ class VLLMApiWrapper(BaseModelWrapper):
             return False
 
     def cleanup(self):
-        # API 클라이언트는 별도 정리가 필요 없음
-        logger.info(f"{self.model_name} API 클라이언트 정리 완료")
+        """vLLM API 클라이언트 정리"""
+        try:
+            if self._model_data:
+                logger.info(f"{self.model_name} API 연결 정리 중...")
+                self._model_data = None
+                self.status = ModelStatus.UNINITIALIZED
+                logger.info(f"{self.model_name} API 연결 정리 완료")
+        except Exception as e:
+            logger.error(f"{self.model_name} API 정리 중 오류: {e}")
 
 
 class ModelManager:
@@ -143,22 +156,13 @@ async def lifespan(app: FastAPI):
     """애플리케이션 라이프사이클 관리"""
     logger.info(f"애플리케이션 시작 (환경: {ENVIRONMENT})")
 
-    # RabbitMQ 연결 초기화
-    logger.info("RabbitMQ 연결 초기화 시작...")
-    try:
-        await rabbitmq_producer.get_rabbitmq_connection()
-        await rabbitmq_producer.get_rabbitmq_channel()  # 채널 및 Exchange 선언 포함
-        logger.info("RabbitMQ 연결 초기화 완료.")
-    except Exception as e:
-        logger.error(f"RabbitMQ 연결 초기화 실패: {e}")
-
-    # 벡터 데이터베이스 초기화 (Quiz Worker와 공유)
+    # 벡터 데이터베이스 초기화
     logger.info("벡터 데이터베이스 초기화 시작...")
     try:
         from app.vector_db.init_data import init_all_vector_stores
 
         init_all_vector_stores()
-        logger.info("벡터 데이터베이스 초기화 완료 (Quiz Worker와 공유)")
+        logger.info("벡터 데이터베이스 초기화 완료")
     except Exception as e:
         logger.error(f"벡터 데이터베이스 초기화 실패: {e}")
 
@@ -178,21 +182,12 @@ async def lifespan(app: FastAPI):
 
     logger.info("애플리케이션 종료: 리소스 정리 중...")
     model_manager.cleanup_all_models()
-
-    # RabbitMQ 연결 종료
-    logger.info("RabbitMQ 연결 종료 중...")
-    try:
-        await rabbitmq_producer.close_rabbitmq_connection()
-        logger.info("RabbitMQ 연결 종료 완료.")
-    except Exception as e:
-        logger.error(f"RabbitMQ 연결 종료 실패: {e}")
-
     logger.info("리소스 정리 완료")
 
 
 app = FastAPI(
     title="Team Matching Quiz AI - Question Generator API",
-    description=f"vLLM OpenAI 호환 API 기반 질문 생성 서비스\n환경: {ENVIRONMENT}\n활성화된 모델: {', '.join(ENABLED_MODELS)}",
+    description=f"vLLM OpenAI 호환 API 기반 질문 생성 서비스\n환경: {ENVIRONMENT}",
     version="2.0.0",
     lifespan=lifespan,
 )
@@ -211,10 +206,8 @@ def get_available_models():
     return model_manager.get_available_models()
 
 
-# API 라우터 포함 (Question Generator만)
+# API 라우터 포함
 app.include_router(generate_router, prefix="/interview", tags=["question-generator"])
-# Quiz API는 Worker에서만 처리하므로 제거
-# app.include_router(quiz_router, prefix="/quiz", tags=["quiz"])
 
 
 @app.get("/health")
@@ -222,7 +215,7 @@ async def health_check():
     """시스템 상태 확인"""
     available_models = get_available_models()
 
-    # 벡터 데이터베이스 상태 확인 (Quiz Worker와 공유)
+    # 벡터 데이터베이스 상태 확인
     vector_db_status = {}
     try:
         from app.vector_db.chroma_client import follow_up_collection, quiz_collection
@@ -232,7 +225,6 @@ async def health_check():
             "quiz_data": quiz_collection.count() > 0,
             "follow_up_count": follow_up_collection.count(),
             "quiz_count": quiz_collection.count(),
-            "shared_with_workers": True,
         }
     except Exception as e:
         logger.error(f"벡터 데이터베이스 상태 확인 실패: {e}")
@@ -242,28 +234,8 @@ async def health_check():
             "error": str(e),
         }
 
-    # Worker 상태 확인 (RabbitMQ 큐 기반)
-    worker_status = {}
-    try:
-        # RabbitMQ 큐 상태로 Worker 상태 추정
-        quiz_worker_status = "active"  # 실제로는 큐 메시지 수나 컨슈머 수로 판단
-        stt_worker_status = "active"   # 실제로는 큐 메시지 수나 컨슈머 수로 판단
-        
-        worker_status = {
-            "quiz_worker": quiz_worker_status,
-            "stt_worker": stt_worker_status,
-        }
-    except Exception as e:
-        logger.error(f"Worker 상태 확인 실패: {e}")
-        worker_status = {
-            "quiz_worker": "unknown",
-            "stt_worker": "unknown",
-            "error": str(e),
-        }
-
-    # 시스템 상태 결정 (API 서버 모델만 고려)
-    api_enabled_models = [model for model in ENABLED_MODELS if model != "quiz_generator"]
-    enabled_count = len(api_enabled_models)
+    # 시스템 상태 결정
+    enabled_count = len(ENABLED_MODELS)
     available_count = len(available_models)
 
     system_status = "healthy"
@@ -272,7 +244,7 @@ async def health_check():
     elif available_count < enabled_count:
         system_status = "degraded"
 
-        return {
+    return {
         "status": system_status,
         "timestamp": datetime.now().isoformat(),
         "environment": ENVIRONMENT,
