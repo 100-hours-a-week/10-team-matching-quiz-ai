@@ -3,8 +3,13 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # RabbitMQ Server Details (AWS)
+<<<<<<< HEAD
 RABBITMQ_HOST = os.getenv('RABBITMQ_HOST')     
 RABBITMQ_PORT = int(os.getenv('RABBITMQ_PORT'))
+=======
+RABBITMQ_HOST = "mq.wingterview.com"
+RABBITMQ_PORT = 5672
+>>>>>>> parent of 09095b4 (✨ Update RabbitMQ configuration: replace hardcoded host and port with environment variables, and correct STT feedback routing key)
 RABBITMQ_USER = os.getenv('RABBITMQ_USER')  
 RABBITMQ_PASSWORD = os.getenv('RABBITMQ_PASSWORD')  
 RABBITMQ_VIRTUAL_HOST = "/" 
@@ -26,8 +31,13 @@ QUIZ_RESPONSE_QUEUE_NAME = "quiz.response.queue"
 # --- STT Feedback Flow ---
 STT_FEEDBACK_EXCHANGE_NAME = "feed.request.exchange"
 STT_FEEDBACK_EXCHANGE_TYPE = "topic" 
+<<<<<<< HEAD
 STT_FEEDBACK_ROUTING_KEY = "feedback.request.routingKey" 
 STT_FEEDBACK_QUEUE_NAME = "feedback.request.queue" 
+=======
+STT_FEEDBACK_ROUTING_KEY = "stt_feedback.tasks" # 이름들을 수정해야한다. 
+STT_FEEDBACK_QUEUE_NAME = "stt.request.queue" # 이름들을 수정해야한다. 
+>>>>>>> parent of 09095b4 (✨ Update RabbitMQ configuration: replace hardcoded host and port with environment variables, and correct STT feedback routing key)
 
 # --STT Response Flow (AI Server -> BE) --
 STT_RESPONSE_EXCHANGE_NAME = "feedback.response.exchange" 
