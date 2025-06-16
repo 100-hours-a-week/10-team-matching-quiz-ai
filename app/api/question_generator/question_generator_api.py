@@ -1,30 +1,25 @@
 
 from fastapi import APIRouter, HTTPException, status
-import asyncio
 import logging
 import time
-import uuid # uuid 추가
+import uuid
+from typing import List, Dict, Any, Optional
+from dotenv import load_dotenv
+
 from app.api.question_generator.question_generator_schema import (
     FollowupRequest,
-    FollowupResponse, # 동기 응답을 위해 다시 사용
+    FollowupResponse,
 )
-from app.api.question_generator.question_generator_model import (
+from app.api.question_generator.question_generator_model_api import (
     call_llm,
     call_openai_api,
+    check_vllm_api_health,
 )
 from app.api.question_generator.question_generator_parser import parse_questions
 from app.api.question_generator.question_generator_config import (
     LANGFUSE_CONFIG,
     API_CONFIG,
 )
-from langfuse import Langfuse
-import os
-from typing import List, Dict, Any, Optional # os 임포트가 중복되어 하나 제거, typing 추가
-from dotenv import load_dotenv
-
-# RabbitMQ 관련 import 제거
-# from app import rabbitmq_producer
-# from app.config.rabbitmq_config import ROUTING_KEY_QUESTION_GENERATOR
 
 load_dotenv()
 
@@ -40,13 +35,25 @@ except ImportError:
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
-# 설정에서 Langfuse 초기화
-langfuse = Langfuse(**LANGFUSE_CONFIG) if all(LANGFUSE_CONFIG.values()) else None
+# Langfuse 초기화
+langfuse = None
+try:
+    if all(LANGFUSE_CONFIG.values()):
+        from langfuse import Langfuse
+        langfuse = Langfuse(**LANGFUSE_CONFIG)
+        logger.info("Langfuse가 성공적으로 초기화되었습니다.")
+    else:
+        logger.warning("Langfuse 설정이 불완전하여 비활성화됩니다.")
+except ImportError:
+    logger.warning("Langfuse 패키지를 찾을 수 없습니다.")
+except Exception as e:
+    logger.error(f"Langfuse 초기화 실패: {e}")
 
-# 설정에서 API 구성 가져오기
+# API 설정
 GENERATE_COUNT = API_CONFIG["generate_count"]
 MAX_HISTORY_QUESTIONS = API_CONFIG["max_history_questions"]
 
+# 프롬프트 캐시
 _prompt_cache = {}
 
 
@@ -143,16 +150,18 @@ def prepare_context(req: FollowupRequest, trace) -> Dict[str, Any]:
 
 
 async def generate_primary_questions(prompt: str, trace) -> List[str]:
-    """주 질문 생성 로직 (동기 처리용)"""
+    """vLLM API를 사용한 주 질문 생성"""
     llm_span = None
     if trace and hasattr(trace, 'span'):
-        llm_span = trace.span(name="llm_call_primary")
+        llm_span = trace.span(name="vllm_api_primary_generation")
+    
     llm_start_time = time.time()
 
     try:
-        # call_llm이 비동기 함수라고 가정
+        # vLLM API 호출
         raw_response = await call_llm(prompt, trace_id=trace.id if trace else None)
         llm_execution_time = time.time() - llm_start_time
+        
         if llm_span:
             llm_span.update(
                 input={"prompt": prompt},
@@ -161,12 +170,15 @@ async def generate_primary_questions(prompt: str, trace) -> List[str]:
             )
             llm_span.end()
 
+        # 응답 파싱
         parsing_span = None
         if trace and hasattr(trace, 'span'):
-            parsing_span = trace.span(name="response_parsing_primary")
+            parsing_span = trace.span(name="response_parsing")
+        
         parsing_start_time = time.time()
         questions = parse_questions(raw_response)[:GENERATE_COUNT]
         parsing_execution_time = time.time() - parsing_start_time
+        
         if parsing_span:
             parsing_span.update(
                 input={"raw_response": raw_response},
@@ -174,14 +186,15 @@ async def generate_primary_questions(prompt: str, trace) -> List[str]:
                 metadata={"execution_time_seconds": parsing_execution_time},
             )
             parsing_span.end()
+        
+        logger.info(f"vLLM API로 {len(questions)}개의 주 질문을 생성했습니다.")
         return questions
+        
     except Exception as e:
         llm_execution_time = time.time() - llm_start_time
-        if llm_span and not llm_span.ended: # llm_span이 None이 아니고 아직 끝나지 않았다면
-            llm_span.end(
-                error=str(e), metadata={"execution_time_seconds": llm_execution_time}
-            )
-        logger.error(f"주 질문 생성 중 오류: {e}")
+        if llm_span:
+            llm_span.end(error=str(e), metadata={"execution_time_seconds": llm_execution_time})
+        logger.error(f"vLLM API 주 질문 생성 중 오류: {e}")
         raise
 
 
@@ -270,86 +283,125 @@ async def generate_additional_questions(
         return existing_questions # 실패 시 기존 질문만 반환
 
 
-@router.post("/followup-questions", response_model=FollowupResponse) # response_model 복원
-async def generate_followup_sync(req: FollowupRequest) -> FollowupResponse: # 함수명 변경 및 RabbitMQ 로직 제거
+@router.post("/followup-questions", response_model=FollowupResponse)
+async def generate_followup_questions(req: FollowupRequest) -> FollowupResponse:
+    """
+    vLLM OpenAI 호환 API를 사용한 꼬리질문 생성
+    """
     validate_request(req)
     request_start_time = time.time()
 
-    # 모델 가용성 체크는 유지
-    from app.main import is_model_available
-    if not is_model_available("question_generator"):
-        logger.error("question_generator 모델이 사용 불가능합니다.")
+    # vLLM API 서버 상태 확인
+    if not await check_vllm_api_health():
+        logger.error("vLLM API 서버가 응답하지 않습니다.")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="꼬리질문 생성 모델이 현재 사용할 수 없습니다. 잠시 후 다시 시도해주세요.",
+            detail="vLLM API 서버가 현재 사용할 수 없습니다. 잠시 후 다시 시도해주세요.",
         )
 
+    # Langfuse 추적 시작
     trace = None
     if langfuse:
         try:
-            # 동기 처리이므로 전체 과정을 하나의 trace로 관리
             trace = langfuse.trace(
-                name="generate_followup_questions_sync",
+                name="generate_followup_questions_vllm_api",
                 input=req.dict(),
-                metadata={"interview_id": req.interview_id, "async": False}, # async: False로 명시
-                # trace_id=f"followup_sync_{req.interview_id}_{uuid.uuid4().hex}" # 필요시 고유 ID 사용
+                metadata={
+                    "interview_id": req.interview_id,
+                    "method": "vllm_openai_compatible_api"
+                },
             )
-            logger.info(f"Langfuse trace 시작 (동기): {trace.id} for interview_id: {req.interview_id}")
+            logger.info(f"Langfuse trace 시작: {trace.id} for interview_id: {req.interview_id}")
         except Exception as e:
             logger.warning(f"Langfuse trace 시작 실패: {e}")
-            trace = None # 실패 시 trace는 None
+            trace = None
 
     try:
+        # 1. 컨텍스트 준비 (RAG 검색 포함)
         context = prepare_context(req, trace)
         
+        # 2. 주 프롬프트 템플릿 로드
         prompt_template = get_cached_prompt("followup_questions_generator")
         if not prompt_template:
-            raise HTTPException(status_code=500, detail="주 질문 생성을 위한 프롬프트 템플릿을 로드할 수 없습니다.")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="주 질문 생성을 위한 프롬프트 템플릿을 로드할 수 없습니다."
+            )
 
         prompt = prompt_template.compile(**context)
 
+        # 3. vLLM API로 주 질문 생성
         questions = await generate_primary_questions(prompt, trace)
 
+        # 4. 부족한 질문 개수를 OpenAI API로 보완
         if len(questions) < GENERATE_COUNT:
-            logger.info(f"생성된 주 질문 개수 부족 ({len(questions)}/{GENERATE_COUNT}), 추가 질문 생성 시도...")
-            # passed_section을 prepare_context에서 가져오거나, generate_additional_questions 내부에서 다시 생성
-            # 여기서는 prepare_context의 passed_questions를 사용한다고 가정
+            remaining_count = GENERATE_COUNT - len(questions)
+            logger.info(f"생성된 주 질문 개수 부족 ({len(questions)}/{GENERATE_COUNT}), OpenAI API로 {remaining_count}개 추가 생성")
+            
             questions = await generate_additional_questions(
-                req,
-                context["passed_questions"], # prepare_context에서 생성된 passed_questions 사용
-                GENERATE_COUNT - len(questions),
-                trace,
-                questions, # 기존에 생성된 질문 전달
+                req, context["passed_questions"], remaining_count, trace, questions
             )
-        
-        if not questions:
-             logger.warning(f"최종 생성된 질문이 없습니다. interview_id={req.interview_id}")
-             # 질문이 전혀 생성되지 않은 경우 빈 리스트 대신 오류를 발생시킬 수도 있음
-             # raise HTTPException(status_code=500, detail="꼬리질문을 생성하지 못했습니다.")
 
+        # 5. 최종 검증 및 응답
+        if not questions:
+            logger.warning(f"최종 생성된 질문이 없습니다. interview_id={req.interview_id}")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="꼬리질문을 생성하지 못했습니다."
+            )
+
+        # 최종 질문 개수 제한
+        final_questions = questions[:GENERATE_COUNT]
+        
         api_processing_time = time.time() - request_start_time
         logger.info(
-            f"꼬리질문 생성 완료 (동기): interview_id={req.interview_id}, "
-            f"count={len(questions)}, total_time={api_processing_time:.4f}s"
+            f"꼬리질문 생성 완료: interview_id={req.interview_id}, "
+            f"count={len(final_questions)}, total_time={api_processing_time:.4f}s"
         )
+
+        # Langfuse 추적 완료
         if trace:
-            trace.update(output={"questions": questions}, metadata={"total_execution_time_seconds": api_processing_time})
+            trace.update(
+                output={"questions": final_questions},
+                metadata={
+                    "total_execution_time_seconds": api_processing_time,
+                    "questions_count": len(final_questions),
+                    "success": True
+                }
+            )
 
         return FollowupResponse(
-            message="Follow-up questions generated successfully.",
+            message="Follow-up questions generated successfully using vLLM API.",
             interview_id=req.interview_id,
-            followup_questions=questions[:GENERATE_COUNT], # 최종적으로 GENERATE_COUNT 만큼만 반환
+            followup_questions=final_questions,
         )
 
-    except HTTPException as http_exc: # FastAPI의 HTTPException은 그대로 전달
+    except HTTPException as http_exc:
+        # FastAPI HTTPException은 그대로 전달
         if trace:
-            trace.update(status="ERROR", output={"error": http_exc.detail, "status_code": http_exc.status_code})
+            trace.update(
+                status="ERROR",
+                output={"error": http_exc.detail, "status_code": http_exc.status_code}
+            )
         raise http_exc
+        
     except Exception as e:
         api_processing_time = time.time() - request_start_time
-        logger.error(f"꼬리질문 생성 중 심각한 오류 발생: interview_id={req.interview_id}, error={str(e)}", exc_info=True)
+        logger.error(
+            f"꼬리질문 생성 중 예상치 못한 오류: interview_id={req.interview_id}, error={str(e)}",
+            exc_info=True
+        )
+        
         if trace:
-            trace.update(status="ERROR", output={"error": str(e)}, metadata={"total_execution_time_seconds": api_processing_time})
+            trace.update(
+                status="ERROR",
+                output={"error": str(e)},
+                metadata={
+                    "total_execution_time_seconds": api_processing_time,
+                    "success": False
+                }
+            )
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"꼬리질문 생성 중 서버 오류 발생: {str(e)}",
