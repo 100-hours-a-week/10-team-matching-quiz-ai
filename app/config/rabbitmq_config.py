@@ -3,8 +3,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # RabbitMQ Server Details (AWS)
-RABBITMQ_HOST = "mq.wingterview.com"
-RABBITMQ_PORT = 5672
+RABBITMQ_HOST = os.getenv('RABBITMQ_HOST')     
+RABBITMQ_PORT = int(os.getenv('RABBITMQ_PORT'))     
 RABBITMQ_USER = os.getenv('RABBITMQ_USER')  
 RABBITMQ_PASSWORD = os.getenv('RABBITMQ_PASSWORD')  
 RABBITMQ_VIRTUAL_HOST = "/" 
@@ -26,7 +26,7 @@ QUIZ_RESPONSE_QUEUE_NAME = "quiz.response.queue"
 # --- STT Feedback Flow ---
 STT_FEEDBACK_EXCHANGE_NAME = "stt.request.exchange"  # 이름들을 수정해야한다. 
 STT_FEEDBACK_EXCHANGE_TYPE = "topic" 
-STT_FEEDBACK_ROUTING_KEY = "stt_feedback.tasks" # 이름들을 수정해야한다. 
+STT_FEEDBACK_ROUTING_KEY = "stt.request.routingKey" # 이름들을 수정해야한다. 
 STT_FEEDBACK_QUEUE_NAME = "stt.request.queue" # 이름들을 수정해야한다. 
 
 # STT Response Flow (AI Server -> BE)
