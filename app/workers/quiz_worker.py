@@ -29,7 +29,9 @@ from app import rabbitmq_producer
 
 # Setup logging
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    level=logging.INFO,
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    force=True,              # ← 강제로 기존 핸들러 제거 후 재설정
 )
 logger = logging.getLogger("QuizWorker")
 
@@ -40,6 +42,35 @@ langfuse_client = Langfuse(
     host=QUIZ_LANGFUSE_HOST,
     debug=False, # Set to True for more verbose Langfuse logs if needed
 )
+
+# 모델 초기화 함수 추가
+def initialize_models():
+    """워커 시작 시 모델들을 미리 GPU에 로드"""
+    logger.info("워커 모델 초기화 시작...")
+    
+    try:
+        # Quiz 생성 모델 초기화 (먼저 실행)
+        logger.info("Quiz 생성 모델 로딩 중...")
+        from app.api.quiz_generator.quiz_generator_model import initialize_quiz_model
+        initialize_quiz_model()
+        logger.info("Quiz 생성 모델 로딩 완료")
+            
+        # 임베딩 모델 초기화 (나중에 실행)
+        logger.info("임베딩 모델 로딩 중...")
+        from app.vector_db.utils import get_embedding_model
+        embedding_model = get_embedding_model()
+        if embedding_model:
+            logger.info("임베딩 모델 로딩 완료")
+        else:
+            logger.error("임베딩 모델 로딩 실패")
+            return False
+            
+        logger.info("워커 모델 초기화 완료")
+        return True
+        
+    except Exception as e:
+        logger.error(f"워커 모델 초기화 실패: {e}", exc_info=True)
+        return False
 
 async def process_quiz_generation_task(message: aio_pika.IncomingMessage):
     async with message.process(ignore_processed=True):
@@ -361,6 +392,14 @@ async def process_quiz_generation_task(message: aio_pika.IncomingMessage):
 
 
 async def main_quiz_worker():
+    # 모델 초기화 추가 (RabbitMQ 연결 전에)
+    logger.info("Quiz Generation Worker 시작: 모델 초기화 중...")
+    if not initialize_models():
+        logger.critical("모델 초기화 실패. 워커를 종료합니다.")
+        return
+    
+    logger.info("Quiz Generation Worker: 모델 초기화 완료, RabbitMQ 연결 시도 중...")
+    
     connection = None
     while True:
         try:
@@ -373,12 +412,12 @@ async def main_quiz_worker():
                 timeout=10,
                 client_properties={'connection_name': 'quiz_worker_connection'}
             )
-            logger.info("Connected to RabbitMQ.")
+            logger.info("Quiz Generation Worker: RabbitMQ 연결 성공")  # 명확한 연결 성공 로그
             break 
         except (aio_pika.exceptions.AMQPConnectionError, ConnectionRefusedError) as e:
             logger.error(f"RabbitMQ connection failed: {e}. Retrying in 5 seconds...")
             await asyncio.sleep(5)
-        except Exception as e: # Catch any other unexpected errors during connection
+        except Exception as e:
             logger.error(f"Unexpected error during RabbitMQ connection: {e}. Retrying in 5 seconds...")
             await asyncio.sleep(5)
 
@@ -403,7 +442,8 @@ async def main_quiz_worker():
         queue = await channel.declare_queue(name=queue_name, durable=True)
         await queue.bind(exchange, routing_key=routing_key)
 
-        logger.info(f"Waiting for messages on queue '{queue_name}' with routing key '{routing_key}'.")
+        # STT Worker 스타일의 명확한 대기 로그 추가
+        logger.info(f"Quiz Generation Worker: 큐 '{queue_name}'에서 라우팅 키 '{routing_key}'로 메시지 대기 중")
         
         try:
             async with queue.iterator() as queue_iter:
@@ -417,12 +457,10 @@ async def main_quiz_worker():
             logger.info("Shutting down Quiz Worker.")
 
 if __name__ == "__main__":
-    # Model initialization for quiz_generator is handled by its lazy loading mechanism
-    # when generate_quiz -> get_model is called.
-    logger.info("Starting Quiz Generation Worker...")
+    logger.info("Quiz Generation Worker 시작 중...")  # 시작 로그도 명확하게
     try:
         asyncio.run(main_quiz_worker())
     except KeyboardInterrupt:
-        logger.info("Quiz Generation Worker interrupted by user. Exiting.")
+        logger.info("Quiz Generation Worker가 사용자에 의해 중단되었습니다.")
     except Exception as e:
-        logger.critical(f"Quiz Generation Worker failed to start or run: {e}", exc_info=True)
+        logger.critical(f"Quiz Generation Worker 실행 실패: {e}", exc_info=True)
