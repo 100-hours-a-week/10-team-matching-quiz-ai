@@ -13,8 +13,9 @@ from app.config import rabbitmq_config
 # Schema for input
 from app.api.stt_feedback.stt_feedback_schema import VoiceFeedbackRequest
 
-# Core logic components
-from app.api.stt_feedback.service.feedback_pipline import run_feedback_pipeline
+# API 함수 직접 import
+from app.api.stt_feedback.stt_feedback_api import process_feedback_request
+
 from app.api.stt_feedback.stt_model_loader import WhisperXModel
 from app import rabbitmq_producer
 
@@ -24,46 +25,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("STTFeedbackWorker")
 
-
-def format_feedback(feedback_dict: dict) -> str:
-    """피드백 딕셔너리를 문자열로 포맷팅"""
-    if not feedback_dict:
-        return ""
-    return (
-        f"{feedback_dict.get('overall_score', '')} 점\n\n"
-        f"{feedback_dict.get('detailed_analysis', '')}\n\n"
-        f"잘한 점: {feedback_dict.get('good_points', '')}\n\n"
-        f"개선할 점: {feedback_dict.get('areas_for_improvement', '')}"
-    )
-
-
-def parse_and_format_response(result) -> dict:
-    """결과를 파싱하고 포맷팅하여 최종 응답 생성"""
-    
-    # 변환 적용: feedback dict → string
-    for item in result.feedbackLists:
-        item.feedback = format_feedback(item.feedback)
-
-    # pipeline 수행 후 결과 로깅
-    for idx, item in enumerate(result.feedbackLists):
-        logger.info(f"[Feedback Result][{idx+1}] Segment ID: {item.segment_id}")
-        logger.info(f"[Feedback Result][{idx+1}] 질문: {item.question}")
-        logger.info(f"[Feedback Result][{idx+1}] 질문별 모범답안: {item.model_answer}")
-        logger.info(f"[Feedback Result][{idx+1}] 질문별 피드백: {item.feedback}")
-        
-    # 응답 데이터 생성 (question 제외)
-    response = result.model_dump()
-    response['feedbackLists'] = [
-        {
-            "segment_id": item["segment_id"],
-            "model_answer": item["model_answer"], 
-            "feedback": item["feedback"]
-        }
-        for item in response['feedbackLists']
-    ]
-
-    return response
-
+# 중복된 함수들 모두 제거
 
 async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
     async with message.process(ignore_processed=True):
@@ -74,16 +36,15 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
 
             request_start_time = time.time()
 
-            # WhisperX 모델 확인 (실제 구현에 맞게 수정)
-            if WhisperXModel.model is None:  # is_loaded() 대신 직접 모델 체크
+            # WhisperX 모델 확인
+            if WhisperXModel.model is None:
                 logger.info("WhisperX model not loaded. Attempting to load...")
                 WhisperXModel.ensure_loaded()
-                if WhisperXModel.model is None:  # 로드 후 다시 체크
+                if WhisperXModel.model is None:
                     logger.error("Failed to load WhisperX model in worker.")
                     await message.reject(requeue=False)
                     return
                 logger.info("WhisperX model loaded successfully in worker.")
-
 
             pipeline_start_time = time.time()
 
@@ -92,13 +53,8 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
             for idx, q in enumerate(req.question_lists):
                 logger.info(f"[Worker] 질문 {idx+1}: {q.question} (start: {q.start_time}, end: {q.end_time})")
             
-            # run_feedback_pipeline is synchronous, run in thread
-            feedback_result = await asyncio.to_thread(
-                run_feedback_pipeline,
-                recording_url=str(req.recording_url),
-                question_lists=req.question_lists
-            )
-            logger.info(f"Feedback pipeline completed for recording URL: {req.recording_url}")
+            # API 함수를 직접 호출 (동기 함수를 비동기로 실행)
+            api_response = await asyncio.to_thread(process_feedback_request, req)
             
             pipeline_execution_time = time.time() - pipeline_start_time
             request_execution_time = time.time() - request_start_time
@@ -112,14 +68,11 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
             
             logger.info(f"Successfully processed STT feedback for recording: {req.recording_url}")
             
-            # Send response back to backend if feedback_result exists
-            if feedback_result:
+            # API에서 반환된 응답을 그대로 RabbitMQ로 전송
+            if api_response:
                 try:
-                    # 응답 파싱 및 포맷팅 적용
-                    formatted_response = parse_and_format_response(feedback_result)
-                    
                     response_success = await rabbitmq_producer.publish_response_message(
-                        message_body=formatted_response,
+                        message_body=api_response,  # API 응답을 그대로 사용
                         exchange_name=rabbitmq_config.STT_RESPONSE_EXCHANGE_NAME,
                         routing_key=rabbitmq_config.STT_RESPONSE_ROUTING_KEY
                     )
@@ -130,17 +83,22 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
                 except Exception as e:
                     logger.error(f"Error publishing STT response for recording {req.recording_url}: {e}")
             
-            logger.info(f"Generated STT Feedback: {formatted_response if 'formatted_response' in locals() else 'None'}")
+            logger.info(f"Generated STT Feedback: {api_response}")
 
             await message.ack()
             logger.info(f"Message {message.message_id} acked.")
 
         except json.JSONDecodeError as e:
             logger.error(f"JSONDecodeError: {e} for message body: {message.body[:200]}", exc_info=True)
-            await message.reject(requeue=False)  # Do not requeue malformed messages
+            await message.reject(requeue=False)
+        except ValueError as e:
+            logger.error(f"Validation error: {e}")
+            await message.reject(requeue=False)
         except Exception as e:
             logger.error(f"Unhandled error processing message {message.message_id if message else 'UnknownMsg'}: {e}", exc_info=True)
             await message.reject(requeue=False)
+
+# ...existing code... (main_stt_feedback_worker 함수는 그대로 유지)
 
 
 async def main_stt_feedback_worker():

@@ -33,20 +33,15 @@ def format_feedback(feedback_dict: dict) -> str:
 
 
 # 피드백 생성
-@router.post("/generate")
-async def receive_feedback(request: VoiceFeedbackRequest):
-    
+def process_feedback_request(request: VoiceFeedbackRequest) -> dict:
+    """API 로직을 독립적인 함수로 분리"""
     logger.info(f"[API 요청] audio file 링크(S3): {request.recording_url}")
     
     for idx, q in enumerate(request.question_lists):
         logger.info(f"[API 요청] 질문: {idx+1}: {q.question} (start: {q.start_time}, end: {q.end_time})")
 
-
     if not request.question_lists:
-        raise HTTPException(
-            status_code=400,
-            detail="question_lists가 비어 있습니다."
-        )
+        raise ValueError("question_lists가 비어 있습니다.")
 
     # 전체 처리: STT + 피드백 + 모범답안 생성
     result = run_feedback_pipeline(
@@ -76,3 +71,14 @@ async def receive_feedback(request: VoiceFeedbackRequest):
     ]
 
     return response
+
+# 피드백 생성
+@router.post("/generate")
+async def receive_feedback(request: VoiceFeedbackRequest):
+    try:
+        return process_feedback_request(request)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        logger.error(f"API 처리 중 오류: {e}")
+        raise HTTPException(status_code=500, detail="내부 서버 오류")
