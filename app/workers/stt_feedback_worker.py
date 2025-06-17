@@ -58,7 +58,6 @@ def parse_and_format_response(result) -> dict:
             "segment_id": item["segment_id"],
             "model_answer": item["model_answer"], 
             "feedback": item["feedback"]
-            # question 필드는 의도적으로 제외
         }
         for item in response['feedbackLists']
     ]
