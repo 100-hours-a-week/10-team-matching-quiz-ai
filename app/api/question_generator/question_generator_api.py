@@ -39,7 +39,7 @@ router = APIRouter()
 logger = logging.getLogger(__name__)
 
 # 설정에서 Langfuse 초기화
-langfuse = Langfuse(**LANGFUSE_CONFIG) if all(LANGFUSE_CONFIG.values()) else None
+langfuse = Langfuse(**LANGFUSE_CONFIG) 
 
 # 설정에서 API 구성 가져오기
 GENERATE_COUNT = API_CONFIG["generate_count"]

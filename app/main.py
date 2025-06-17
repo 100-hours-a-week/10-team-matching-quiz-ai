@@ -21,7 +21,6 @@ logger.info(f"활성화된 모델들: {ENABLED_MODELS}")
 
 class ModelType(Enum):
     VLLM = "vllm"
-    TRANSFORMERS = "transformers"
 
 
 class ModelStatus(Enum):
@@ -29,7 +28,6 @@ class ModelStatus(Enum):
     INITIALIZING = "initializing"
     READY = "ready"
     ERROR = "error"
-    LAZY_READY = "lazy_ready"
 
 
 class BaseModelWrapper(ABC):
@@ -62,7 +60,7 @@ class VLLMModelWrapper(BaseModelWrapper):
         self.status = ModelStatus.INITIALIZING
         try:
             if ENVIRONMENT.startswith("gcp-"):
-                os.environ["VLLM_GPU_MEMORY_UTILIZATION"] = "0.7"
+                os.environ["VLLM_GPU_MEMORY_UTILIZATION"] = "0.45"
                 os.environ["VLLM_MAX_MODEL_LEN"] = "2048"
 
             from app.api.question_generator.question_generator_model import (
