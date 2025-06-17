@@ -6,15 +6,15 @@ from pydantic import BaseModel, Field, HttpUrl
 
 # 질문 별 상세 내용 : 시작(초), 종료(초), 질문별 Interview id, 질문 내용
 class QuestionItem(BaseModel):
+    segment_id: str
     start_time: int 
     end_time: int 
-    interview_id: str 
     question: str 
 
 # audio 음성(S3), 질문 리스트
 class VoiceFeedbackRequest(BaseModel):
     recording_url: HttpUrl = Field(..., description="S3에 저장된 전체 음성 URL")
-    questionLists: List[QuestionItem]
+    question_lists: List[QuestionItem]
 
 
 # 응답 스키마 (Response)
@@ -26,7 +26,7 @@ class StandardResponse(BaseModel):
 # 400 - 요청 형식 오류
 class InvalidRequestResponse(BaseModel):
     message: str = "invalid_request"
-    data: Dict[str, str]  # 예: { "reason": "questionLists가 비어 있음" }
+    data: Dict[str, str]  # 예: { "reason": "question_lists가 비어 있음" }
 
 # 401 - 토큰 만료
 class TokenExpiredResponse(BaseModel):

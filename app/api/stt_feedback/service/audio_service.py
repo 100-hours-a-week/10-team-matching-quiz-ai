@@ -11,6 +11,8 @@ def download_audio(url: str) -> str:
     S3 URL에서 오디오 파일을 다운로드하여 임시 파일로 저장
     확장자는 URL에서 자동으로 추출하여 suffix에 붙여 저장하도록 작성
     """
+    url = str(url)  # HttpUrl -> str 변환
+
     logger.info(f"[STT] 음성 다운로드 시작: {url}")
     try:
         response = requests.get(url)
