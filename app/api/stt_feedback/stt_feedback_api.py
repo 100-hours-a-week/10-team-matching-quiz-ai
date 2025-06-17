@@ -61,7 +61,7 @@ def process_feedback_request(request: VoiceFeedbackRequest) -> dict:
         logger.info(f"[Feedback Result][{idx+1}] 질문별 피드백: {item.feedback}")
         
     response = result.model_dump()
-    response['feedbackLists'] = [
+    response['feedback_lists'] = [
         {
             "segment_id": item["segment_id"],
             "model_answer": item["model_answer"],
