@@ -33,6 +33,26 @@ test-trackers = ["comet-ml", "dvclive", "tensorboard", "wandb"]
 testing = ["bitsandbytes", "datasets", "diffusers", "evaluate", "parameterized", "pytest (>=7.2.0,<=8.0.0)", "pytest-subtests", "pytest-xdist", "scikit-learn", "scipy", "timm", "torchpippy (>=0.2.0)", "tqdm", "transformers"]
 
 [[package]]
+name = "aio-pika"
+version = "0.10.7"
+description = "Wrapper for the PIKA for asyncio and humans."
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "aio-pika-0.10.7.tar.gz", hash = "sha256:99dbc4978e1c88f531e66e61758948485257d9d0d40d9f27849c59018f33f686"},
+    {file = "aio_pika-0.10.7-py3-none-any.whl", hash = "sha256:7be52a14e4c5f0962ae227518aec7582cf78d3cacf9a1d13a5afe875722b5a52"},
+]
+
+[package.dependencies]
+pika = "<0.11"
+shortuuid = "*"
+yarl = "*"
+
+[package.extras]
+develop = ["asynctest", "coverage (!=4.3)", "coveralls", "pylama", "pytest", "pytest-asyncio", "pytest-cov", "sphinx", "sphinx-autobuild", "timeout-decorator", "tox (>=2.4)"]
+
+[[package]]
 name = "aiohappyeyeballs"
 version = "2.6.1"
 description = "Happy Eyeballs for asyncio"
@@ -5459,6 +5479,23 @@ quality = ["black", "hf-doc-builder", "ruff (>=0.2.1,<0.3.0)"]
 test = ["black", "datasets", "diffusers (<0.21.0)", "hf-doc-builder", "parameterized", "pytest", "pytest-cov", "pytest-xdist", "ruff (>=0.2.1,<0.3.0)", "scipy"]
 
 [[package]]
+name = "pika"
+version = "0.10.0"
+description = "Pika Python AMQP Client Library"
+optional = false
+python-versions = "*"
+groups = ["main"]
+files = [
+    {file = "pika-0.10.0-py2.py3-none-any.whl", hash = "sha256:63131aaeec48a6c8f1db1fe657e1e74cf384c3927eb7d1725e31edae4220dea4"},
+    {file = "pika-0.10.0.tar.gz", hash = "sha256:7277b4d12a99efa4058782614d84138983f9f89d690bdfcea66290d810806459"},
+]
+
+[package.extras]
+libev = ["pyev"]
+tornado = ["tornado"]
+twisted = ["twisted"]
+
+[[package]]
 name = "pillow"
 version = "11.2.1"
 description = "Python Imaging Library (Fork)"
@@ -7642,6 +7679,18 @@ files = [
 ]
 
 [[package]]
+name = "shortuuid"
+version = "1.0.13"
+description = "A generator library for concise, unambiguous and URL-safe UUIDs."
+optional = false
+python-versions = ">=3.6"
+groups = ["main"]
+files = [
+    {file = "shortuuid-1.0.13-py3-none-any.whl", hash = "sha256:a482a497300b49b4953e15108a7913244e1bb0d41f9d332f5e9925dba33a3c5a"},
+    {file = "shortuuid-1.0.13.tar.gz", hash = "sha256:3bb9cf07f606260584b1df46399c0b87dd84773e7b25912b7e391e30797c5e72"},
+]
+
+[[package]]
 name = "six"
 version = "1.17.0"
 description = "Python 2 and 3 compatibility utilities"
@@ -9518,4 +9567,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = ">=3.10,<3.13"
-content-hash = "dd47efdd9e39330fa729e41fdac9d0b8fd56e57e8aef8880db64309b765590f5"
+content-hash = "54b2ca5766723fcb0fa3931f700e607f20fe5a347242eb197fef11b7ee06b099"
