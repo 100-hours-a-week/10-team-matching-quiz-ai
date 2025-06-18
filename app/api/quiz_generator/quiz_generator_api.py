@@ -1,14 +1,20 @@
-from fastapi import APIRouter, HTTPException, Response
-from app.api.quiz_generator.quiz_generator_schema import (
-    FollowupRequest,
-    FollowupResponse,
-)
+from fastapi import APIRouter, HTTPException
+from app.api.quiz_generator.quiz_generator_schema import FollowupRequest
 from app import rabbitmq_producer
 from app.config import rabbitmq_config
 import logging
+import sys
 
 router = APIRouter()
+
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+if not logger.hasHandlers():
+    handler = logging.StreamHandler(sys.stdout)
+    formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
 
 
 @router.post("/generate-quiz", status_code=202)
@@ -20,18 +26,10 @@ async def generate_quiz_api(req: FollowupRequest):
     logger.info(f"퀴즈 생성 요청 수신 (비동기 처리): interview_id={req.interview_id}")
     logger.info(f"질문 히스토리 개수: {len(req.question_history_list)}")
 
-    # 입력 검증
-    if not req.question_history_list:
-        raise HTTPException(
-            status_code=400,
-            detail="question_history_list가 비어 있습니다."
-        )
-
-    if len(req.question_history_list) < 1:
-        raise HTTPException(
-            status_code=400,
-            detail="최소 1개 이상의 질문이 필요합니다."
-        )
+    # 없으면 CS 퀴즈 생성
+    if req.question_history_list is None:
+        logger.warning("질문 히스토리가 None입니다. 빈 리스트로 대체합니다.")
+        req.question_history_list = []
 
     # Quiz Worker 상태 확인 (RabbitMQ 연결로 대체)
     try:
