@@ -2,7 +2,8 @@ from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.api.stt_feedback.stt_feedback_api import router as feedback_router
 from app.api.stt_feedback.stt_model_loader import WhisperXModel
-from app.core.rabbitmq import RabbitMQConnection
+from app.config import rabbitmq_config
+from app import rabbitmq_producer
 import logging
 
 logging.basicConfig(
@@ -28,7 +29,7 @@ async def lifespan(app: FastAPI):
     # RabbitMQ 연결 초기화
     logger.info("RabbitMQ 연결 초기화 시작...")
     try:
-        await RabbitMQConnection.connect()
+        await rabbitmq_producer.get_rabbitmq_connection()
         logger.info("RabbitMQ 연결 초기화 완료")
     except Exception as e:
         logger.error(f"RabbitMQ 연결 초기화 실패: {e}")
@@ -40,7 +41,7 @@ async def lifespan(app: FastAPI):
     # RabbitMQ 연결 종료
     logger.info("RabbitMQ 연결 종료 중...")
     try:
-        await RabbitMQConnection.close()
+        await rabbitmq_producer.close_rabbitmq_connection()
         logger.info("RabbitMQ 연결 종료 완료")
     except Exception as e:
         logger.error(f"RabbitMQ 연결 종료 실패: {e}")
