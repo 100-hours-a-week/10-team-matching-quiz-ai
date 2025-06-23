@@ -8,7 +8,6 @@ import logging
 logger = logging.getLogger("stt")
 
 router = APIRouter(
-    prefix="/feedback",
     tags=["stt-feedback"]
 )
 
