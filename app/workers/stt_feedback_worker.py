@@ -183,10 +183,10 @@ async def main_stt_feedback_worker():
 
 
 if __name__ == "__main__":
-    logger.info("Starting STT Feedback Worker...")
+    logger.info("STT Feedback Worker 실행중...")
     try:
         asyncio.run(main_stt_feedback_worker())
     except KeyboardInterrupt:
-        logger.info("STT Feedback Worker interrupted by user. Exiting.")
+        logger.info("STT Feedback Worker interrupted by user.")
     except Exception as e:
         logger.critical(f"STT Feedback Worker failed to start or run: {e}", exc_info=True)
