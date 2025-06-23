@@ -1,3 +1,4 @@
+from dotenv import load_dotenv # .env 파일 추가
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from app.api.stt_feedback.stt_feedback_api import router as feedback_router
