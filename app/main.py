@@ -186,6 +186,15 @@ def get_available_models():
 # 라우터 등록
 app.include_router(generate_router, prefix="/interview", tags=["question-generator"])
 
+@app.get("/")
+async def root():
+    """루트 엔드포인트"""
+    return {
+        "service": "Team Matching Quiz AI",
+        "version": "1.0.0",
+        "environment": ENVIRONMENT,
+        "status": "running"
+    }
 
 @app.get("/health")
 async def health_check():

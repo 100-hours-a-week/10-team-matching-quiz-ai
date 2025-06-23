@@ -204,3 +204,32 @@ async def generate_followup(req: FollowupRequest) -> FollowupResponse:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=error_msg,
         )
+
+@router.get("/status")
+async def question_generator_status():
+    """질문 생성기 상태 확인"""
+    from app.main import is_model_available
+    from app.api.question_generator.question_generator_model import check_vllm_health
+    
+    model_available = is_model_available("question_generator")
+    api_healthy = False
+    
+    if model_available:
+        try:
+            api_healthy = await check_vllm_health()
+        except Exception as e:
+            logger.error(f"vLLM 상태 확인 실패: {e}")
+    
+    return {
+        "service": "question_generator",
+        "model_available": model_available,
+        "vllm_api_healthy": api_healthy,
+        "vector_db_available": VECTOR_DB_AVAILABLE,
+        "langfuse_configured": langfuse is not None,
+        "status": "healthy" if (model_available and api_healthy) else "unhealthy",
+        "config": {
+            "api_base_url": VLLM_API_CONFIG["base_url"],
+            "model_name": VLLM_API_CONFIG["model_name"],
+            "generate_count": GENERATE_COUNT,
+        }
+    }
