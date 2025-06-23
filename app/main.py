@@ -59,22 +59,20 @@ class VLLMModelWrapper(BaseModelWrapper):
     def initialize(self) -> bool:
         self.status = ModelStatus.INITIALIZING
         try:
-            if ENVIRONMENT.startswith("gcp-"):
-                os.environ["VLLM_GPU_MEMORY_UTILIZATION"] = "0.45"
-                os.environ["VLLM_MAX_MODEL_LEN"] = "2048"
-
             from app.api.question_generator.question_generator_model import (
                 initialize_llm,
                 get_llm_engine,
+                check_vllm_health,
             )
 
-            logger.info(f"{self.model_name} (vLLM) 초기화 시도...")
+
+            logger.info(f"{self.model_name} (vLLM API) 초기화 시도...")
             if initialize_llm():
                 current_engine = get_llm_engine()
                 if current_engine:
                     self._model_data = current_engine
                     self.status = ModelStatus.READY
-                    logger.info(f"{self.model_name} 초기화 완료")
+                    logger.info(f"{self.model_name} API 클라이언트 초기화 완료")
                     return True
 
             self.status = ModelStatus.ERROR
@@ -86,10 +84,9 @@ class VLLMModelWrapper(BaseModelWrapper):
             return False
 
     def cleanup(self):
-        if self._model_data and hasattr(self._model_data, "shutdown_background_loop"):
+        if self._model_data:
             try:
-                self._model_data.shutdown_background_loop()
-                logger.info(f"{self.model_name} 정리 완료")
+                logger.info(f"{self.model_name} API 클라이언트 정리 완료")
             except Exception as e:
                 logger.error(f"{self.model_name} 정리 오류: {e}")
 
@@ -199,6 +196,14 @@ async def health_check():
     """시스템 상태 확인"""
     available_models = get_available_models()
 
+    # vLLM API 상태 확인
+    vllm_api_status = False
+    try:
+        from app.api.question_generator.question_generator_model import check_vllm_health
+        vllm_api_status = await check_vllm_health()
+    except Exception as e:
+        logger.error(f"vLLM API 상태 확인 실패: {e}")
+
     # 벡터 데이터베이스 상태 확인
     vector_db_status = {}
     try:
@@ -237,6 +242,7 @@ async def health_check():
         "models_status": {
             "question_generator": is_model_available("question_generator")
         },
+        "vllm_api_status": vllm_api_status,
         "vector_db_status": vector_db_status,
         "system_info": {
             "total_enabled": enabled_count,
