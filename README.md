@@ -1,28 +1,61 @@
 # WingTerView - AI Service (10조 모의면접 매칭 및 퀴즈 서비스)
 
 📌 **프로젝트 개요**
-- **서비스명:** WingTerView - 모의면접 매칭 및 복습 퀴즈 서비스
-- **AI Service 역할:** 본 리포지토리는 WingTerView 서비스의 핵심 AI 기능을 담당하며, 다음 역할을 수행합니다.
-    - 면접 질문에 대한 꼬리질문 생성
-    - 사용자의 면접 기록 기반 복습 퀴즈 생성
-    - STT(Speech-to-Text) 변환 텍스트 기반 면접 피드백 요약 및 개선점 제공
+- **서비스명:** WingTerView - AI 기반 모의면접 및 복습 서비스
+- **AI Service 역할:** 본 리포지토리는 WingTerView 서비스의 핵심 AI 기능을 담당하며, 실제 면접관처럼 사용자와 상호작용하고 개인화된 학습 경험을 제공합니다.
+    - 면접 질문에 대한 심층 꼬리질문 실시간 생성
+    - 사용자의 면접 기록 기반 맞춤형 복습 퀴즈 생성
+    - STT 변환 텍스트 기반 음성 면접 분석 및 피드백 제공
 
 📦 **주요 기능**
 
 | 기능                  | 설명                                                                                                           |
 | :-------------------- | :------------------------------------------------------------------------------------------------------------- |
-| 면접 꼬리질문 생성    | 선택 질문, 키워드, 과거 질문 기록, 유사 질문을 기반으로 문맥에 맞는 꼬리질문 (1개 또는 4개) 생성               |
+| 면접 꼬리질문 생성    | 선택 질문, 키워드, 과거 질문 기록, 유사 질문을 기반으로 문맥에 맞는 꼬리질문 생성               |
 | 복습용 퀴즈 생성      | 사용자의 면접 기록을 분석하여 4지선다형 복습 퀴즈 10개 자동 생성 (문제, 보기, 정답, 해설 포함)                 |
 | 음성 기반 피드백 생성 | 면접 중 녹음된 음성(STT 변환 텍스트)을 분석하여 면접 태도, 답변 내용 등에 대한 피드백 요약 및 개선 포인트 제공 |
 
 ---
 
-🏗️ **아키텍처 개요**
+🏗️ **시스템 아키텍처**
 
--   **모델 서빙:** FastAPI와 vLLM, Langchain을 사용하여 LLM 모델 서빙 및 API 구현
--   **Vector DB:** ChromaDB를 활용하여 RAG(Retrieval-Augmented Generation) 구현
--   **파일 저장:** AWS S3를 음성 파일 저장소로 사용
--   **모니터링:** Langfuse (질문/퀴즈 트래킹), Langsmith (피드백 트래킹)를 통한 요청/응답 로깅 및 성능 모니터링
+```mermaid
+graph TD
+    subgraph "서비스 인터페이스"
+        User([User Interaction]) --> FastAPI[FastAPI AI Server]
+        FastAPI <-->|OAuth 2.0| Backend[Backend Server]
+    end
+
+    %% Synchronous Path
+    subgraph "실시간 꼬리질문 (동기 처리)"
+        FastAPI -- Sync --> vLLM[vLLM Server]
+        vLLM --> Gemma[gemma3 LLM]
+        Gemma --> Chroma[ChromaDB-RAG]
+    end
+
+    %% Asynchronous Path
+    subgraph "퀴즈 & 음성 피드백 (비동기 처리)"
+        S3[(AWS S3 <br/> Audio Files)]
+        MySQL[(MySQL <br/> Result)]
+
+        FastAPI -- Async --> RabbitMQ{RabbitMQ}
+        RabbitMQ --> QuizWorker[Quiz Worker]
+        RabbitMQ --> STTWorker[STT Worker]
+
+        QuizWorker --> MySQL
+
+        S3 --> STTWorker
+        STTWorker --> Whisper[Whisper]
+        Whisper --> MySQL
+    end
+```
+
+
+- **AI 면접관:** `vLLM` + `gemma3-4bit LoRA Fine-tuned` 모델로 실시간 꼬리질문 생성
+- **비동기 처리:** `RabbitMQ`를 통해 퀴즈 생성 및 음성 분석을 백그라운드에서 처리하여 사용자 대기 시간 최소화
+- **독립적인 STT 파이프라인:** 음성 파일 처리(`S3` 저장), `STT` 변환, 피드백 생성 과정은 비동기적으로 처리되며 별도의 흐름으로 관리됨.
+- **Vector DB:** `ChromaDB` 기반 RAG로 최신 기술 면접 질문/문서를 검색하여 답변 정확성 강화
+- **모니터링:** `Langfuse` & `Langsmith`를 통해 LLM 응답 품질 및 지연 시간 실시간 추적
 
 ---
 
@@ -38,7 +71,7 @@
 | **LLM 모델**             | `Qwen3` (4B / 2B, LoRA fine-tuned)        | -                      | 최신 경량 구조 기반 LLM, LoRA를 통한 도메인 특화 튜닝으로 성능 효율적 향상 가능                           |
 | **RAG (Vector DB)**      | `ChromaDB`                                | `1.0.7`                | 문서 임베딩 기반의 빠르고 확장성 있는 벡터 검색 지원, RAG 연동에 최적화                                   |
 | **벡터 임베딩 모델**     | `Alibaba-NLP/gte-multilingual-base`       | -                      | 한국어 포함 다국어 임베딩에 강력하며, GTE 계열로 높은 성능과 효율적인 RAG 통합 지원                       |
-| **음성 인식(STT)**       | `Whisper` (openai-whisper 기반)           | `1.1.10`               | 고정밀 음성 인식 가능, 면접 음성 피드백 기능에 적용됨                                                     |
+| **음성 인식(STT)**       | `Whisperㅌ` (openai-whisper 기반)           | `1.1.10`               | 고정밀 음성 인식 가능, 면접 음성 피드백 기능에 적용됨                                                     |
 | **LLM 모니터링 및 평가** | `LangSmith` + `Langfuse`                  | `0.3.33` / `2.60.3`    | LangSmith: LLM 응답 평가 관리, Langfuse: 요청별 트레이스와 실시간 품질/지연 시간 추적 가능                |
 | **데이터 저장소**        | AWS S3, MySQL                             | -                      | S3: 음성 파일 등 대용량 비정형 데이터 저장, MySQL: 질문/퀴즈/피드백 등 정형 데이터 관리                   |
 | **배포 및 인프라**       | GCP Compute Engine, Docker, Jenkins CI/CD | -                      | GCP: AI 추론 서버 호스팅, Docker: 이식성과 환경 일관성 확보, Jenkins: 지속적 배포 자동화 파이프라인 지원  |
@@ -47,11 +80,12 @@
 
 📡 **API 주요 엔드포인트**
 
-| 기능             | Method | Endpoint                        | 설명                                              |
-| :--------------- | :----- | :------------------------------ | :------------------------------------------------ |
-| 꼬리 질문 생성   | POST   | `/interview/followup-questions` | 선택 질문 기반 꼬리질문 1개 또는 4개 생성         |
-| 복습 퀴즈 생성   | POST   | `/quiz/generate`                | 면접 기록 기반 복습 퀴즈 10개 생성                |
-| 음성 피드백 요청 | POST   | `/stt/submit`                   | S3 URI 기반 STT 및 피드백 생성 요청 (비동기 처리) |
+| 기능 | Endpoint | 설명 | 처리 방식 |
+|:---|:---|:---|:---|
+| **꼬리질문 생성** | `/interview/followup-questions` | 선택 질문 기반 심층 꼬리질문 생성 | 동기 (즉시 응답) |
+| **복습 퀴즈 생성** | `/quiz/generate` | 면접 기록 기반 4지선다 퀴즈 10개 (해설 포함) 자동 생성 | 비동기 (RabbitMQ) |
+| **음성 면접 분석** | `/stt/submit` | S3 음성 파일 URI 기반 STT 및 피드백 생성 요청 | 비동기 (RabbitMQ) |
+| **상태 확인** | `/health` | AI 모델 및 서버 상태 실시간 확인 | 동기 (즉시 응답) |
 
 ---
 
@@ -59,8 +93,8 @@
 
 1.  **면접 꼬리질문 생성 (Follow-up Questions)**
     * 입력: 사용자가 선택한 질문, 관련 키워드, 해당 사용자의 과거 질문 기록, DB 내 유사 질문
-    * 처리: 입력 정보를 조합하여 Prompt 구성 후 LLM(Gemma) 호출 (LangChain 활용)
-    * 출력: 문맥에 맞는 꼬리질문 1개 (일반 모드) 또는 4개 (AI 면접관 모드)
+    * 처리: 입력 정보를 조합하여 Prompt 구성 후 LLM(Gemma) 호출 (vllm 활용)
+    * 출력: 문맥에 맞는 꼬리질문 생성 
     * 저장: 생성된 질문은 MySQL에 기록
 
 2.  **복습 퀴즈 생성 (Quiz Generation)**
@@ -92,41 +126,12 @@
 | `main`      | 릴리즈/운영 브랜치 | 전체 재검증 실행 + 태그 생성 가능                        | (없음)        | 병합 후 배포 수행, 안정화 완료 후 hotfix 병합 가능    |
 | `hotfix/*`  | 운영 중 긴급 수정  | 전체 파이프라인 실행                                     | `main`, `dev` | 빠른 수정 적용 후 main에 병합, dev와 코드 동기화 필요 |
 
-### CI/CD 파이프라인
-
-#### CI 파이프라인 다이어그램
-![CI/CD Pipeline Diagram](https://github.com/user-attachments/assets/3ba03007-0b13-420a-a876-32f37f38b739)
-
-#### 파이프라인 단계별 역할
-
-| 단계               | 설명                                                                                    | 사용 도구             | 산출물 예시                       | 실행 대상 브랜치          | 성공/실패 기준                 |
-| :----------------- | :-------------------------------------------------------------------------------------- | :-------------------- | :-------------------------------- | :------------------------ | :----------------------------- |
-| **1. 트리거 감지** | 브랜치 Push 또는 PR 이벤트 감지                                                         | GitHub Webhook        | -                                 | 모든 브랜치               | Git 이벤트 정상 수신           |
-| **2. Checkout**    | 레포지토리 코드 clone                                                                   | Git                   | 전체 코드베이스                   | 모든 브랜치               | Clone 성공 여부                |
-| **3. Build**       | 코드 컴파일 및 패키징 (Spring Boot: Gradle, React: npm build, AI: 선택적 빌드 스크립트) | Gradle, npm           | `.jar`, `/build` 폴더             | `dev`, `main`, `hotfix/*` | Exit code 0                    |
-| **4. 정적 분석**   | 코드 스타일 검사 및 품질 분석                                                           | Checkstyle, SonarQube | 분석 리포트                       | `dev`, `main`, `hotfix/*` | 에러/경고 0건 기준             |
-| **5. 테스트**      | 단위 테스트 및 커버리지 리포트 생성                                                     | JUnit, Jest, pytest   | HTML 리포트, 커버리지 수치        | `dev`, `main`, `hotfix/*` | 테스트 통과, 커버리지 80% 이상 |
-| **6. 산출물 저장** | 빌드 결과 및 리포트 저장                                                                | Jenkins, S3           | `.jar`, `index.html`, 리포트 폴더 | `dev`, `main`             | 파일 업로드 성공 여부          |
-| **7. 알림 전송**   | 결과를 Email로 전송                                                                     | Email Plugin          | 성공/실패 메시지                  | 모든 브랜치               | 전송 완료 여부                 |
-
-### 커밋 메시지 규칙 (Commit Convention)
-
-일관된 커밋 메시지를 통해 협업 시 변경 사항을 명확하게 공유하고, CI 파이프라인 자동화 및 향후 릴리즈 노트 생성에도 활용하기 위해 특정 형식을 적용합니다. (구체적인 형식은 별도 CONTRIBUTING.md 또는 Wiki 문서 참조)
-
-### 테스트 실행 기준 (Test Execution Criteria)
-
--   모든 Pull Request에는 최소한 테스트 및 정적 분석이 수행되어야 합니다.
--   `main` 브랜치 병합 전에는 전체 테스트 파이프라인(테스트 통과 및 커버리지 기준 충족 포함)을 통과해야 합니다.
--   테스트 실패 또는 커버리지 기준 미달 시 병합 불가 원칙을 적용합니다.
-
 ---
+**성능 최적화 및 모델 튜닝**
 
-🔍 **모델 튜닝 및 최적화**
-
--   **LoRA 기반 미세 조정 (PEFT):** `qwen3-4b` 모델을 기반으로 특정 면접 도메인에 맞게 LoRA 파인튜닝을 적용하여 성능 향상.
--   **RAG (Retrieval-Augmented Generation):** ChromaDB에 저장된 최신 면접 질문 데이터 및 IT 기술 문서를 검색하여 LLM의 답변 생성을 보강, 최신성 및 정확성 확보.
--   **vLLM 서빙:** PagedAttention 등의 최적화 기술이 적용된 vLLM을 사용하여 LLM 서빙 처리량(throughput)을 높이고 응답 지연 시간(latency)을 단축하여 동시 사용자 요청 처리 능력 강화.
--   **모델 평가 및 지속 개선:** Langfuse 및 Langsmith를 이용해 LLM 요청/응답을 로깅하고 분석하여 모델 성능을 지속적으로 모니터링하고 개선.
+-   **vLLM 고속 추론:** PagedAttention 기술을 활용하여 LLM 서빙 처리량(Throughput)을 극대화하고 응답 지연 시간(Latency)을 단축하여 다수의 동시 면접 요청을 원활하게 처리합니다.
+-   **LoRA 파인튜닝:** 경량 모델인 `Gemma3` 및 `Qwen3`를 개발자 면접 데이터로 LoRA 파인튜닝하여, 적은 리소스로 특정 도메인(기술 면접)에 대한 질문/답변 생성 능력을 극대화했습니다.
+-   **RAG 정확도 향상:** `ChromaDB`에 최신 IT 기술 문서와 면접 질문 데이터를 지속적으로 업데이트하여, LLM이 최신 정보를 기반으로 정확하고 깊이 있는 답변을 생성하도록 보강합니다.
 
 ---
 
@@ -148,7 +153,4 @@
 
 ---
 
-✨ **특이사항**
 
--   **MCP (Massive Compute Platform) 미사용:** 현재 AI 서비스의 호출 흐름이 비교적 단순하여, MCP 도입 시 관리 복잡성이 증가할 것으로 판단하여 사용하지 않음.
--   **독립적인 STT 파이프라인:** 음성 파일 처리(S3 저장), STT 변환, 피드백 생성 과정은 비동기적으로 처리되며 별도의 흐름으로 관리됨.
