@@ -47,10 +47,26 @@ def enrich_question(question: str, keyword: str = None):
     return enriched
 
 
-def embed_texts(texts, keyword: str = None):
+def embed_texts(texts, keyword: str = None, enrich_type: str = "question"):
+    """
+    텍스트를 임베딩으로 변환
+    
+    Args:
+        texts: 임베딩할 텍스트 리스트
+        keyword: 키워드 (question 타입일 때만 사용)
+        enrich_type: "question" (꼬리질문용, enrich 적용) 또는 "quiz" (퀴즈용, enrich 미적용)
+    """
     model = get_embedding_model()
-    enriched = [enrich_question(text, keyword) for text in texts]
-    return model.encode(enriched, normalize_embeddings=True).tolist()
+    
+    if enrich_type == "question":
+        # 꼬리질문 생성용: enrich_question 적용
+        enriched = [enrich_question(text, keyword) for text in texts]
+        return model.encode(enriched, normalize_embeddings=True).tolist()
+    elif enrich_type == "quiz":
+        # 퀴즈 생성용: 원본 텍스트 그대로 사용
+        return model.encode(texts, normalize_embeddings=True).tolist()
+    else:
+        raise ValueError("enrich_type은 'question' 또는 'quiz'여야 합니다.")
 
 
 def clean_keyword_phrase(text: str) -> str:
