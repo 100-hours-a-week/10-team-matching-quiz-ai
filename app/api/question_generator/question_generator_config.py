@@ -9,7 +9,7 @@ HF_TOKEN = os.getenv("HF_TOKEN", "")
 
 # vLLM API 설정
 VLLM_API_CONFIG = {
-    "base_url": os.getenv("VLLM_API_BASE", "http://127.0.0.1:8000/v1"),
+    "base_url": os.getenv("VLLM_API_BASE", "http://127.0.0.1:8080/v1"),
     "api_key": os.getenv("VLLM_API_KEY", "dummy-key"),
     "model_name": os.getenv("VLLM_MODEL_NAME", "TommyKong/gemma-3-finetune-4bit"),
     "timeout": float(os.getenv("LLM_TIMEOUT", "8.0")),
