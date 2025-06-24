@@ -13,6 +13,42 @@ logger = logging.getLogger(__name__)
 logger.info(f"감지된 환경: {ENVIRONMENT}")
 logger.info(f"활성화된 모델들: {ENABLED_MODELS}")
 
+class EmbeddingModelManager:
+    def __init__(self):
+        self.embedding_model = None
+        self.model_loaded = False
+        
+    def load_embedding_model(self):
+        if self.model_loaded:
+            logger.info('임베딩 모델 이미 로드완료')
+            return True 
+    
+        try:
+            logger.info('임베딩 모델 로드 시작')
+            from app.vector_db.utils import get_embedding_model
+            self.embedding_model = get_embedding_model()
+            self.model_loaded = True 
+            logger.info('임베딩 모델 로드 완료')
+            return True  
+        except Exception as e:
+            logger.error(f'임베딩 모델 로드 실패:{e}') 
+            return False
+    
+    def get_model(self):
+        """임베딩 모델 반환"""
+        if not self.model_loaded:  
+            self.load_embedding_model()
+        return self.embedding_model 
+    
+    def is_ready(self):
+        """모델 준비 상태"""
+        return self.model_loaded  
+    
+    def cleanup(self):
+        """리소스 정리"""
+        self.embedding_model = None 
+        self.model_loaded = False   
+        logger.info("임베딩 모델 정리 완료")
 
 class ModelManager:
     """간소화된 모델 관리자"""
@@ -68,7 +104,7 @@ class ModelManager:
 
 # 전역 모델 매니저
 model_manager = ModelManager()
-
+embedding_manager = EmbeddingModelManager()
 
 def initialize_vector_db():
     """벡터 데이터베이스 초기화"""
@@ -111,6 +147,7 @@ async def get_system_status():
     # 시스템 상태 결정
     enabled_count = len(ENABLED_MODELS)
     available_count = len(available_models)
+    embedding_ready = embedding_manager.is_ready()
     
     if available_count == 0:
         system_status = "unhealthy"
@@ -127,6 +164,9 @@ async def get_system_status():
         "available_models": available_models,
         "vllm_api_status": vllm_api_status,
         "vector_db_status": vector_db_status,
+        "embedding_model_status": { 
+            "ready": embedding_ready,
+        },
         "system_info": {
             "total_enabled": enabled_count,
             "total_available": available_count,
@@ -140,26 +180,35 @@ async def lifespan(app: FastAPI):
     """애플리케이션 라이프사이클 관리"""
     logger.info(f"애플리케이션 시작 (환경: {ENVIRONMENT})")
 
-    # 벡터 데이터베이스 초기화
-    logger.info("벡터 데이터베이스 초기화 시작...")
-    initialize_vector_db()
-
-    # 모델 초기화
-    logger.info("모델 초기화 시작...")
-    initialization_success = model_manager.initialize_models()
-
-    if initialization_success:
-        logger.info("모델 초기화 성공")
+    logger.info("임베딩 모델 프리로딩 시작...")
+    embedding_success = embedding_manager.load_embedding_model()
+    if embedding_success:
+        logger.info("임베딩 모델 프리로딩 완료")
     else:
-        logger.warning("일부 모델 초기화 실패")
+        logger.warning("임베딩 모델 프리로딩 실패")
 
+    # 2. 벡터 데이터베이스 초기화 (이미 로딩된 임베딩 모델 사용)
+    logger.info("벡터 데이터베이스 초기화 시작...")
+    vector_success = initialize_vector_db()
+
+    # 3. vLLM 모델 초기화
+    logger.info("LLM 모델 초기화 시작...")
+    llm_success = model_manager.initialize_models()
+
+    # 초기화 결과 출력
+    logger.info(f"초기화 완료 - Embedding: {embedding_success}, Vector DB: {vector_success}, LLM: {llm_success}")
+    
     available_models = model_manager.get_available_models()
     logger.info(f"사용 가능한 모델들: {available_models}")
+    
+    # 🚀 모든 준비 완료 - 이제 POST 요청 받을 준비됨!
+    logger.info(" API 요청 대기 중...")
 
     yield
 
     logger.info("애플리케이션 종료: 리소스 정리 중...")
     model_manager.cleanup()
+    embedding_manager.cleanup()  # 임베딩 모델 정리 추가
     logger.info("리소스 정리 완료")
 
 
@@ -181,6 +230,17 @@ def is_model_available(model_name: str) -> bool:
 def get_available_models():
     """사용 가능한 모델 목록"""
     return model_manager.get_available_models()
+
+
+# 전역 임베딩 모델 접근 함수 (다른 모듈에서 사용)
+def get_embedding_model():
+    """전역 임베딩 모델 반환"""
+    return embedding_manager.get_model()
+
+
+def is_embedding_ready():
+    """임베딩 모델 준비 상태"""
+    return embedding_manager.is_ready()
 
 
 # 라우터 등록
