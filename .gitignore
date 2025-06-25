@@ -1,3 +1,4 @@
+
 # -----------------------------
 # Python 환경 기본 무시 파일
 # -----------------------------
@@ -94,3 +95,4 @@ cloudflared
 dataset/
 .pyright/
 .mypy_cache/
+.env_for_api
