@@ -15,4 +15,6 @@ pkill -f "uvicorn app.main:app" || echo "FastAPI 서버가 실행 중이지 않�
 echo "→ 퀴즈 생성 워커 종료"
 pkill -f "app.workers.quiz_worker" || echo "Quiz 워커가 실행 중이지 않음"
 
+rm -f logs/*.log
+
 echo "모든 서비스 종료 완료"
