@@ -26,10 +26,15 @@ nohup python -m vllm.entrypoints.openai.api_server \
   --enable-prefix-caching \
   >> logs/vllm_server.log 2>&1 &
 
+
+sleep 30
+
 echo "FastAPI 서버 시작"
 echo "$(date '+%Y-%m-%d %H:%M:%S') - FastAPI 시작" >> logs/fastapi_server.log
 nohup python -m uvicorn app.main:app --host=0.0.0.0 --port=8000 \
   >> logs/fastapi_server.log 2>&1 &
+
+sleep 15
 
 echo "퀴즈 생성 워커 시작"
 echo "$(date '+%Y-%m-%d %H:%M:%S') - Quiz Worker 시작" >> logs/quiz_worker.log
