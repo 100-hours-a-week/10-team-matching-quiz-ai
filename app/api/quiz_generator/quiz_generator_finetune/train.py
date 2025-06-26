@@ -62,13 +62,14 @@ training_args = TrainingArguments(
 # ─── 학습 실행 ─────────────────────────────────────────────
 trainer = SFTTrainer(
     model=model,
-    tokenizer=tokenizer,
     train_dataset=dataset,
     args=training_args,
     peft_config=get_lora_config(),
     max_seq_length=512,
     dataset_text_field="prompt"
 )
+
+trainer.tokenizer = tokenizer
 
 trainer.train()
 
