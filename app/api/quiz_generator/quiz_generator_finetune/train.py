@@ -66,7 +66,6 @@ trainer = SFTTrainer(
     train_dataset=dataset,
     args=training_args,
     peft_config=get_lora_config(),
-    max_seq_length=512,
     dataset_text_field="prompt"
 )
 
