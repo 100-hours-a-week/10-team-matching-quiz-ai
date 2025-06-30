@@ -49,8 +49,9 @@ training_args = TrainingArguments(
     num_train_epochs=15,
     learning_rate=2e-4,
     save_total_limit=3,
-    save_strategy="epoch",                # ✅ 에폭마다 저장
-    logging_dir=f"{output_dir}/logs",     # ✅ 텐서보드 로그 저장 위치
+    save_strategy="steps",                # 스탭마다 저장
+    save_steps=200,
+    logging_dir=f"{output_dir}/logs",     # 텐서보드 로그 저장 위치
     logging_steps=10,
     output_dir=output_dir,
     optim="paged_adamw_32bit",
@@ -75,7 +76,7 @@ trainer.tokenizer = tokenizer
 model.save_pretrained(f"{output_dir}/final_model")
 tokenizer.save_pretrained(f"{output_dir}/final_model")
 
-print("✅ 훈련 완료 및 모델 저장됨:", output_dir)
+print("훈련 완료 및 모델 저장됨:", output_dir)
 
 def main():
     trainer.train()
@@ -84,7 +85,7 @@ def main():
     model.save_pretrained(f"{output_dir}/final_model")
     tokenizer.save_pretrained(f"{output_dir}/final_model")
 
-    print("✅ 훈련 완료 및 모델 저장됨:", output_dir)
+    print("훈련 완료 및 모델 저장됨:", output_dir)
 
 
 if __name__ == "__main__":
