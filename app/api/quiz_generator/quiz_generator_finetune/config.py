@@ -14,7 +14,7 @@ def get_lora_config():
     return LoraConfig(
         r=8,
         lora_alpha=16,
-        target_modules=["q_proj", "v_proj"],
+        target_modules=["q_proj", "v_proj", "k_proj", "o_proj"],
         lora_dropout=0.1,
         bias="none",
         task_type="CAUSAL_LM",
