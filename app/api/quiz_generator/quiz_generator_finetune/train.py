@@ -65,8 +65,7 @@ trainer = SFTTrainer(
     model=model,
     train_dataset=dataset,
     args=training_args,
-    peft_config=get_lora_config(),
-    dataset_text_field="prompt"
+    peft_config=get_lora_config()
 )
 
 trainer.tokenizer = tokenizer
