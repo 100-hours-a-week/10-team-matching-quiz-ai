@@ -6,24 +6,31 @@ import time
 
 def load_model(model_path, base_model="Qwen/Qwen3-8B"):
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
-
     base = AutoModelForCausalLM.from_pretrained(
         base_model,
         device_map="auto",
         torch_dtype=torch.bfloat16,
         trust_remote_code=True,
     )
-
     model = PeftModel.from_pretrained(base, model_path)
     model.eval()
     return tokenizer, model
 
-def generate_answer(tokenizer, model, instruction, input_text=None, max_new_tokens=512):
-    if input_text:
-        prompt = f"{instruction}\n\n{input_text}" if instruction else input_text
-    else:
-        prompt = instruction
+def sanitize_input(input_text):
+    # 경험형/yes-no형 질문 → 개념/정의형 퀴즈로 변환 (커스텀 규칙 추가 가능)
+    keywords = ["사용해보신 적", "경험이 있으신가요", "해보신 경험", "해보셨나요"]
+    for kw in keywords:
+        if kw in input_text:
+            # 명사 부분만 추출 (간단 로직)
+            # ex) "LangChain을 프로젝트에서 사용해보신 적이 있으신가요?" → "LangChain"
+            before = input_text.split("을")[0].split("를")[0].replace("프로젝트에서 ", "")
+            concept = before.strip()
+            return f"{concept}의 주요 개념은 무엇인가요?"
+    return input_text
 
+def generate_answer(tokenizer, model, instruction, input_text=None, max_new_tokens=512):
+    # instruction이 비어있으면 input만 프롬프트로
+    prompt = f"{instruction}\n\n{input_text}" if instruction else input_text
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     with torch.no_grad():
         outputs = model.generate(
@@ -42,36 +49,49 @@ if __name__ == "__main__":
     parser.add_argument("--max_new_tokens", type=int, default=512, help="최대 출력 토큰 수")
     args = parser.parse_args()
 
-    # 예시로 10개 input (여기다 원하는 문제 리스트 넣으면 됨)
-    inputs = [
+    # ❶ 문제 pool (원하는 질문 입력, 개수 적으면 자동 반복)
+    input_pool = [
         "REST API의 장점은 무엇인가요?",
         "SQL과 NoSQL의 차이점은?",
         "Python의 GIL(Global Interpreter Lock)은 무엇인가요?",
         "머신러닝과 딥러닝의 차이는?",
         "Langchain을 프로젝트에서 사용해보신 적이 있으신가요?",
-        "JWT(Json Web Token)의 주요 목적은 무엇인가요?"
+        "JWT(Json Web Token)의 주요 목적은 무엇인가요?",
+        "클라우드에서 오토스케일링이란?",
+        "TCP와 UDP의 차이점은?",
+        "파이썬에서 데코레이터란 무엇인가요?",
+        "프로젝트를 하면서 rag를 사용해보신 경험이 있으신가요?"
+        # 필요시 더 추가 가능!
     ]
 
+    # ❷ 10문제 미만이면 반복해서 10개 채우기
+    num_quiz = 10
+    if len(input_pool) < num_quiz:
+        inputs = (input_pool * (num_quiz // len(input_pool) + 1))[:num_quiz]
+    else:
+        inputs = input_pool[:num_quiz]
+
     tokenizer, model = load_model(args.model_dir)
-    
+
     total_start = time.time()
     results = []
 
     for idx, input_text in enumerate(inputs):
+        quiz_input = sanitize_input(input_text)
         print(f"\n[{idx+1}] 문제 생성 중...")
         start = time.time()
-        output = generate_answer(tokenizer, model, args.instruction, input_text, max_new_tokens=args.max_new_tokens)
+        output = generate_answer(tokenizer, model, args.instruction, quiz_input, max_new_tokens=args.max_new_tokens)
         elapsed = time.time() - start
         print(f"[{idx+1}] 생성 완료 (소요 시간: {elapsed:.2f}초)")
         print("-" * 20)
         print(output)
         print("-" * 20)
         results.append({
-            "input": input_text,
+            "input": quiz_input,
             "output": output,
             "elapsed": elapsed
         })
-    
+
     total_elapsed = time.time() - total_start
     print(f"\n전체 10문제 생성 소요 시간: {total_elapsed:.2f}초")
     print("문제별 소요 시간(초):", [round(r['elapsed'], 2) for r in results])
