@@ -79,7 +79,7 @@ tokenizer.save_pretrained(f"{output_dir}/final_model")
 print("훈련 완료 및 모델 저장됨:", output_dir)
 
 def main():
-    trainer.train(resume_from_checkpoint="./qwen3_lora_output_20250630_074558/checkpoint-400")
+    trainer.train(resume_from_checkpoint="./qwen3_lora_output_20250701_024450/checkpoint-1000")
 
     # ─── 모델 저장 ─────────────────────────────────────────────
     model.save_pretrained(f"{output_dir}/final_model")
