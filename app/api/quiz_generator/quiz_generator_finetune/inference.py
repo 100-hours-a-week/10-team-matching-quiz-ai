@@ -2,6 +2,7 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from peft import PeftModel
 import argparse
+import time
 
 def load_model(model_path, base_model="Qwen/Qwen3-8B"):
     tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
@@ -19,7 +20,7 @@ def load_model(model_path, base_model="Qwen/Qwen3-8B"):
 
 def generate_answer(tokenizer, model, instruction, input_text=None, max_new_tokens=512):
     if input_text:
-        prompt = f"{instruction}\n\n{input_text}"
+        prompt = f"{instruction}\n\n{input_text}" if instruction else input_text
     else:
         prompt = instruction
 
@@ -37,10 +38,44 @@ def generate_answer(tokenizer, model, instruction, input_text=None, max_new_toke
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", type=str, required=True, help="훈련된 모델 경로")
-    parser.add_argument("--instruction", type=str, required=True, help="명령/instruction 입력")
-    parser.add_argument("--input", type=str, default=None, help="질문/입력 텍스트")
+    parser.add_argument("--instruction", type=str, default="", help="명령/instruction 입력")
+    parser.add_argument("--max_new_tokens", type=int, default=512, help="최대 출력 토큰 수")
     args = parser.parse_args()
 
+    # 예시로 10개 input (여기다 원하는 문제 리스트 넣으면 됨)
+    inputs = [
+        "HTTP와 HTTPS의 차이점은 무엇인가요?",
+        "REST API의 장점은 무엇인가요?",
+        "OSI 7계층에서 4계층은 무엇인가요?",
+        "SQL과 NoSQL의 차이점은?",
+        "Python의 GIL(Global Interpreter Lock)은 무엇인가요?",
+        "Docker와 VM의 차이점은?",
+        "머신러닝과 딥러닝의 차이는?",
+        "클라우드에서 오토스케일링이란?",
+        "TCP와 UDP의 차이점은?",
+        "JWT(Json Web Token)의 주요 목적은 무엇인가요?"
+    ]
+
     tokenizer, model = load_model(args.model_dir)
-    output = generate_answer(tokenizer, model, args.instruction, args.input)
-    print("\n🧠 생성된 응답:\n", output)
+    
+    total_start = time.time()
+    results = []
+
+    for idx, input_text in enumerate(inputs):
+        print(f"\n[{idx+1}] 문제 생성 중...")
+        start = time.time()
+        output = generate_answer(tokenizer, model, args.instruction, input_text, max_new_tokens=args.max_new_tokens)
+        elapsed = time.time() - start
+        print(f"[{idx+1}] 생성 완료 (소요 시간: {elapsed:.2f}초)")
+        print("-" * 20)
+        print(output)
+        print("-" * 20)
+        results.append({
+            "input": input_text,
+            "output": output,
+            "elapsed": elapsed
+        })
+    
+    total_elapsed = time.time() - total_start
+    print(f"\n전체 10문제 생성 소요 시간: {total_elapsed:.2f}초")
+    print("문제별 소요 시간(초):", [round(r['elapsed'], 2) for r in results])
