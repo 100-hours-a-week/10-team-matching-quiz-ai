@@ -3,7 +3,7 @@ import torch
 
 model = AutoModelForCausalLM.from_pretrained(
     "Qwen/Qwen3-8B",
-    device_map="cpu",  # GPU 부족하면 CPU라도 가능
+    device_map="cuda",  # GPU 부족하면 CPU라도 가능
     trust_remote_code=True,
     torch_dtype=torch.bfloat16
 )
