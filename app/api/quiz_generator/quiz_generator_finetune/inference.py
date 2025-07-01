@@ -6,7 +6,7 @@ import time
 from math import ceil
 
 def load_model(model_path, base_model="Qwen/Qwen3-8B"):
-    tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True, padding_side="left")
     base = AutoModelForCausalLM.from_pretrained(
         base_model,
         device_map="auto",
