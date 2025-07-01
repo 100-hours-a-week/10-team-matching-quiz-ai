@@ -44,15 +44,11 @@ if __name__ == "__main__":
 
     # 예시로 10개 input (여기다 원하는 문제 리스트 넣으면 됨)
     inputs = [
-        "HTTP와 HTTPS의 차이점은 무엇인가요?",
         "REST API의 장점은 무엇인가요?",
-        "OSI 7계층에서 4계층은 무엇인가요?",
         "SQL과 NoSQL의 차이점은?",
         "Python의 GIL(Global Interpreter Lock)은 무엇인가요?",
-        "Docker와 VM의 차이점은?",
         "머신러닝과 딥러닝의 차이는?",
-        "클라우드에서 오토스케일링이란?",
-        "TCP와 UDP의 차이점은?",
+        "Langchain을 프로젝트에서 사용해보신 적이 있으신가요?",
         "JWT(Json Web Token)의 주요 목적은 무엇인가요?"
     ]
 
