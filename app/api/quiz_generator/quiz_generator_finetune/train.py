@@ -50,14 +50,14 @@ training_args = TrainingArguments(
     learning_rate=2e-4,
     save_total_limit=3,
     save_strategy="steps",                # 스탭마다 저장
-    save_steps=200,
+    save_steps=100,
     logging_dir=f"{output_dir}/logs",     # 텐서보드 로그 저장 위치
     logging_steps=10,
     output_dir=output_dir,
     optim="paged_adamw_32bit",
     lr_scheduler_type="cosine",
     warmup_ratio=0.05,
-    max_steps=8000,
+    max_steps=1000,
     report_to="tensorboard"
 )
 
@@ -79,7 +79,7 @@ tokenizer.save_pretrained(f"{output_dir}/final_model")
 print("훈련 완료 및 모델 저장됨:", output_dir)
 
 def main():
-    trainer.train()
+    trainer.train("./qwen3_lora_output_20250701_043758/checkpoint-800")
 
     # ─── 모델 저장 ─────────────────────────────────────────────
     model.save_pretrained(f"{output_dir}/final_model")
