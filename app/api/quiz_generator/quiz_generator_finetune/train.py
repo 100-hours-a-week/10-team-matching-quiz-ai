@@ -13,7 +13,7 @@ hf_logging.set_verbosity_info()
 
 # ─── 환경 설정 ─────────────────────────────────────────────
 model_name = "Qwen/Qwen3-8B"
-data_path = "quiz_finetune_ft.jsonl"
+data_path = "quiz_dummy_ft.jsonl"
 time_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 output_dir = f"./qwen3_lora_output_{time_stamp}"
 os.makedirs(output_dir, exist_ok=True)
@@ -79,7 +79,7 @@ tokenizer.save_pretrained(f"{output_dir}/final_model")
 print("훈련 완료 및 모델 저장됨:", output_dir)
 
 def main():
-    trainer.train(resume_from_checkpoint="./qwen3_lora_output_20250703_003109/checkpoint-300")
+    trainer.train()
 
     # ─── 모델 저장 ─────────────────────────────────────────────
     model.save_pretrained(f"{output_dir}/final_model")
