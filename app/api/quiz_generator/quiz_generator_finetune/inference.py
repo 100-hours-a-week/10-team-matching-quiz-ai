@@ -19,7 +19,7 @@ def load_model(model_path, base_model="Qwen/Qwen3-8B"):
     model.eval()
     return tokenizer, model
 
-def batch_generate(tokenizer, model, input_list, instruction="", max_new_tokens=512):
+def batch_generate(tokenizer, model, input_list, instruction="", max_new_tokens=2048):
     # instruction은 거의 안써도 되지만, 혹시 쓸 일이 있으면 포함
     prompts = [
         f"{instruction}\n\n{inp}" if instruction else inp
@@ -40,7 +40,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", type=str, required=True, help="훈련된 모델 경로 (ex: ./qwen3_lora_output_20250703_003109/checkpoint-300)")
     parser.add_argument("--instruction", type=str, default="", help="명령/instruction 입력 (거의 사용 X)")
-    parser.add_argument("--max_new_tokens", type=int, default=512, help="최대 출력 토큰 수")
+    parser.add_argument("--max_new_tokens", type=int, default=2048, help="최대 출력 토큰 수")
     parser.add_argument("--batch_size", type=int, default=1, help="한 번에 생성할 세트 개수")
     args = parser.parse_args()
 
