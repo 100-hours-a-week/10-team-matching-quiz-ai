@@ -46,7 +46,9 @@ if __name__ == "__main__":
 
     # ==== [실전 input 예시 - 여러 세트 한번에!] ====
     input_prompts = [
-        """[질문 목록]
+        """
+        질문 목록을 기반으로 유사 참고 질문 목록을 참고해서 객관식 퀴즈를 난이도 하 4개, 중 3개, 상 3개 순서대로 10개만 생성해줘 모든 문제는 서로 중복되면 안돼.
+        [질문 목록]
         REST API란 무엇인가요?
         머신러닝과 딥러닝의 차이점은 무엇인가요?
         Transformer는 언제 사용하나요?
@@ -71,8 +73,6 @@ if __name__ == "__main__":
     for idx, (inp, out) in enumerate(zip(inputs, results)):
         print(f"\n[세트 {idx+1}] 생성 결과")
         print("=" * 60)
-        print(f"입력 프롬프트:\n{inp.strip()}")
-        print("-" * 40)
         print("생성된 퀴즈 세트(원본 출력):\n")
         print(out)
         print("=" * 60)

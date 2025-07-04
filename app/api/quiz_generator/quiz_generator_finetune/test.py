@@ -1,39 +1,28 @@
 import json
-import re
 
-file_path = "quiz_finetune_ft.jsonl"   # 기존 파일 경로
-output_path = file_path.replace(".jsonl", "_input.jsonl")
+input_path = "quiz_finetune_final.jsonl"
+output_path = "quiz_finetune_final_dedup.jsonl"
 
-instruction = "질문 목록을 기반으로 유사 참고 질문 목록을 참고해서 객관식 퀴즈를 난이도 하 4개, 중 3개, 상 3개 순서대로 10개만 생성해줘 모든 문제는 서로 중복되면 안돼"
+seen_inputs = set()
+count_total = 0
+count_written = 0
 
-def split_questions(text):
-    """입력 텍스트에서 [질문 목록], [유사 참고 질문 목록] 분리"""
-    q_match = re.search(r"\[질문 목록\]\n(.*?)(\[유사 참고 질문 목록\]\n|$)", text, re.DOTALL)
-    r_match = re.search(r"\[유사 참고 질문 목록\]\n(.*)", text, re.DOTALL)
-    qs = q_match.group(1).strip() if q_match else ""
-    rs = r_match.group(1).strip() if r_match else ""
-    return qs, rs
+with open(input_path, "r", encoding="utf-8") as infile, \
+     open(output_path, "w", encoding="utf-8") as outfile:
+    for line in infile:
+        try:
+            data = json.loads(line)
+        except Exception as e:
+            print("⚠️ JSON decode error:", e)
+            continue
+        # input 기준으로만 중복 제거
+        key = data.get("input")
+        if key is None:
+            continue  # input이 없는 라인은 스킵
+        count_total += 1
+        if key not in seen_inputs:
+            seen_inputs.add(key)
+            outfile.write(json.dumps(data, ensure_ascii=False) + "\n")
+            count_written += 1
 
-lines = []
-with open(file_path, "r", encoding="utf-8") as fin:
-    for line in fin:
-        obj = json.loads(line)
-        # 기존 input에서 질문/유사질문 추출 (혹은 output을 바탕으로 자동 추출해도 됨)
-        # 여기서는 기존 input을 최대한 살리는 예시 (변환 필요하면 맞게 수정!)
-        qs, rs = split_questions(obj["input"])
-        if not qs:  # fallback: 개행으로 나눈 첫번째 블록
-            parts = obj["input"].split('\n\n')
-            qs = parts[0].strip() if parts else ""
-        # 최종 input 생성
-        new_input = f"{instruction}\n[질문 목록]\n{qs}\n[유사 참고 질문 목록]\n{rs if rs else ''}"
-        new_obj = {
-            "input": new_input,
-            "output": obj["output"]
-        }
-        lines.append(new_obj)
-
-with open(output_path, "w", encoding="utf-8") as fout:
-    for obj in lines:
-        fout.write(json.dumps(obj, ensure_ascii=False) + "\n")
-
-print(f"✅ input만 변환 완료! ({len(lines)}개) → {output_path}")
+print(f"✅ 중복 제거 완료: {count_total}줄 중 {count_written}줄만 남김!")
