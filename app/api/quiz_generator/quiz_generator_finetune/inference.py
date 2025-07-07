@@ -39,10 +39,14 @@ def batch_generate(tokenizer, model, input_list, instruction="", max_new_tokens=
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("--model_dir", type=str, required=True, help="훈련된 모델 경로 (ex: ./qwen3_lora_output_20250703_003109/checkpoint-300)")
-    parser.add_argument("--instruction", type=str, default="", help="명령/instruction 입력 (거의 사용 X)")
+    parser.add_argument("--model_dir", type=str, required=True, help="훈련된 모델 경로 (ex: ...)")
     parser.add_argument("--max_new_tokens", type=int, default=1024, help="최대 출력 토큰 수")
     args = parser.parse_args()
+
+    # 👇 여기!!! (변수 선언부)
+    instruction = (
+        "아래 질문들로 총 10개의 객관식 퀴즈를 만들고 난이도별 하 4문제, 중 3문제, 상 3문제로 순서대로 출력하세요."
+    )
 
     print("========== [QUIZ GENERATOR INFERENCE START] ==========")
     print("[INFO] 모델 로딩 중...")
@@ -55,7 +59,6 @@ if __name__ == "__main__":
         print("종료하려면 그냥 Enter(빈 줄)만 입력.")
         print("="*60)
         
-        # 여러 줄 입력 받기
         batch_inputs = []
         while True:
             line = input()
@@ -67,9 +70,10 @@ if __name__ == "__main__":
             break
 
         total_start = time.time()
+        # 👇 batch_generate에 instruction 인자로 넣는 부분!
         results = batch_generate(
             tokenizer, model, batch_inputs,
-            instruction=args.instruction,
+            instruction=instruction,  # 여기도!
             max_new_tokens=args.max_new_tokens
         )
 
