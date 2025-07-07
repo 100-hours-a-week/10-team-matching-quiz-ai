@@ -13,7 +13,7 @@ hf_logging.set_verbosity_info()
 
 # ─── 환경 설정 ─────────────────────────────────────────────
 model_name = "Qwen/Qwen3-8B"
-data_path = "quiz_finetune_ft_input.jsonl"
+data_path = "quiz_finetune.jsonl"
 time_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 output_dir = f"./qwen3_lora_output_{time_stamp}"
 os.makedirs(output_dir, exist_ok=True)
