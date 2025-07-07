@@ -1,14 +1,14 @@
 import os
+from datetime import datetime
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments
 from transformers import logging as hf_logging
 from trl import SFTTrainer
 from peft import prepare_model_for_kbit_training, get_peft_model
-from datetime import datetime
 from sklearn.model_selection import train_test_split
 
 from config import get_bnb_config, get_lora_config
-from dataset import load_dataset_from_jsonl
+from dataset import load_dataset_from_jsonl  # 함수가 Dataset 반환해야 함
 
 hf_logging.set_verbosity_info()
 
@@ -30,23 +30,23 @@ model = AutoModelForCausalLM.from_pretrained(
 model = prepare_model_for_kbit_training(model)
 
 # ─── 토크나이저 ─────────────────────────────────────────────
-tokenizer = AutoTokenizer.from_pretrained(
-    model_name, trust_remote_code=True
-)
+tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 
 # ─── LoRA 적용 ─────────────────────────────────────────────
 model = get_peft_model(model, get_lora_config())
 model.print_trainable_parameters()
 
 # ─── 데이터 로딩 및 분할 ─────────────────────────────────────
-dataset = load_dataset_from_jsonl(data_path)
-# dataset: list of dict (or Dataset object)
-if isinstance(dataset, list):  # 만약 리스트라면 train_test_split
-    train_data, val_data = train_test_split(dataset, test_size=0.1, random_state=42)
-else:
-    # Huggingface Dataset이면 .train_test_split 가능
-    split = dataset.train_test_split(test_size=0.1, seed=42)
-    train_data, val_data = split["train"], split["test"]
+dataset = load_dataset_from_jsonl(data_path)  # Dataset 객체 반환
+# 만약 Dataset 객체가 아니라면 아래처럼 리스트 분할
+if not hasattr(dataset, 'train_test_split'):
+    # 리스트라면 Dataset.from_list로 변환 필요
+    from datasets import Dataset
+    dataset = Dataset.from_list(dataset)
+
+split = dataset.train_test_split(test_size=0.1, seed=42)
+train_data = split["train"]
+val_data = split["test"]
 
 # ─── 학습 파라미터 설정 ──────────────────────────────────────
 training_args = TrainingArguments(
@@ -57,9 +57,9 @@ training_args = TrainingArguments(
     num_train_epochs=15,
     learning_rate=2e-4,
     save_total_limit=3,
-    save_strategy="steps",                # 스탭마다 저장
+    save_strategy="steps",
     save_steps=200,
-    logging_dir=f"{output_dir}/logs",     # 텐서보드 로그 저장 위치
+    logging_dir=f"{output_dir}/logs",
     logging_steps=10,
     output_dir=output_dir,
     optim="paged_adamw_32bit",
@@ -67,11 +67,11 @@ training_args = TrainingArguments(
     warmup_ratio=0.05,
     max_steps=2000,
     report_to="tensorboard",
-    evaluation_strategy="steps",          # [추가] 평가 전략
-    eval_steps=200,                      # [추가] N 스텝마다 평가
-    load_best_model_at_end=True,          # [추가] 베스트 체크포인트 자동 로딩
-    metric_for_best_model="eval_loss",    # [추가] 평가 기준
-    greater_is_better=False,              # [추가] loss 기준이므로 False
+    evaluation_strategy="steps",     # ⬅️ Best 모델 선정 위한 평가 옵션
+    eval_steps=200,
+    load_best_model_at_end=True,     # ⬅️ Best checkpoint 자동 불러오기
+    metric_for_best_model="eval_loss",
+    greater_is_better=False,
 )
 
 # ─── Trainer 생성 ──────────────────────────────────────────
@@ -80,17 +80,15 @@ trainer = SFTTrainer(
     train_dataset=train_data,
     eval_dataset=val_data,
     args=training_args,
-    peft_config=get_lora_config()
+    peft_config=get_lora_config(),
 )
 trainer.tokenizer = tokenizer
 
 def main():
-    trainer.train(resume_from_checkpoint="./qwen3_lora_output_20250707_070819/checkpoint-1300")  # resume 쓸 거면 체크포인트 경로, 아니면 None
-
-    # 베스트 모델 저장 (자동으로 best로 로딩됨)
+    trainer.train(resume_from_checkpoint=None)
+    # Best checkpoint 자동 로드됨!
     model.save_pretrained(f"{output_dir}/final_model")
     tokenizer.save_pretrained(f"{output_dir}/final_model")
-
     print("훈련 완료 및 모델 저장됨:", output_dir)
 
 if __name__ == "__main__":
