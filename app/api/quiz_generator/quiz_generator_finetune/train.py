@@ -85,7 +85,7 @@ trainer = SFTTrainer(
 trainer.tokenizer = tokenizer
 
 def main():
-    trainer.train(resume_from_checkpoint=None)
+    trainer.train(resume_from_checkpoint="./qwen3_lora_output_20250707_051148/checkpoint-1000")
     # Best checkpoint 자동 로드됨!
     model.save_pretrained(f"{output_dir}/final_model")
     tokenizer.save_pretrained(f"{output_dir}/final_model")
