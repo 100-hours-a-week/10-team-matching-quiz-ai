@@ -19,18 +19,14 @@ instruction = (
 with open(input_path, encoding="utf-8") as fin, open(output_path, "w", encoding="utf-8") as fout:
     for line in fin:
         row = json.loads(line)
-        # 기존 구조: {"input": "...", "output": {...}}
-        # output 구조 예시: {"difficulty": "...", "question": "...", "options": [...], "answer_index": 1, "explanation": "..."}
         data = row["output"]
-        # 원하는 output 텍스트 포맷으로 변환
         output_text = (
             f"난이도: {data['difficulty']}\n"
             f"문제: {data['question']}\n"
             f"선지: {json.dumps(data['options'], ensure_ascii=False)}\n"
-            f"정답 인덱스: {data['output']['answer_index']}\n"
+            f"정답 인덱스: {data['answer_index']}\n"
             f"해설: {data['explanation']}"
         )
-        # instruction + 포맷예시 + 실제 문장
         prompt = (
             f"{instruction}\n문장: {row['input']}"
         )
