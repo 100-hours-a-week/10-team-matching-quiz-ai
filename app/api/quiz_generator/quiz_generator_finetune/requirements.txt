@@ -6,3 +6,7 @@ accelerate==0.30.1
 datasets==2.19.0
 trl==0.7.10
 tensorboard
+
+# ↓↓↓ Unsloth와 unsloth-zoo 최신 개발 버전 추가 (호환 가능)
+git+https://github.com/unslothai/unsloth.git
+git+https://github.com/unslothai/unsloth-zoo.git

@@ -1,82 +1,46 @@
-import os
-from datetime import datetime
 import torch
-from transformers import (
-    AutoModelForCausalLM,
-    AutoTokenizer,
-    TrainingArguments,
-    logging as hf_logging
-)
-from trl import SFTTrainer
-from peft import prepare_model_for_kbit_training, get_peft_model
+from unsloth import FastLanguageModel
+from datasets import load_dataset
 
-from config import get_bnb_config, get_lora_config
-from dataset import load_dataset_from_jsonl  # 반드시 HuggingFace Dataset 반환해야 함
-
-hf_logging.set_verbosity_info()
-
-# ─── 환경 설정 ─────────────────────────────────────────────
-model_name = "Qwen/Qwen3-8B"
-data_path = "quiz_finetune.jsonl"
-time_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-output_dir = f"./qwen3_lora_output_{time_stamp}"
-os.makedirs(output_dir, exist_ok=True)
-
-# ─── 모델 로딩 ─────────────────────────────────────────────
-model = AutoModelForCausalLM.from_pretrained(
-    model_name,
-    quantization_config=get_bnb_config(),
-    device_map="auto",
-    trust_remote_code=True,
-    torch_dtype=torch.bfloat16,
-)
-model = prepare_model_for_kbit_training(model)
-
-# ─── 토크나이저 ─────────────────────────────────────────────
-tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
-
-# ─── LoRA 적용 ─────────────────────────────────────────────
-model = get_peft_model(model, get_lora_config())
-model.print_trainable_parameters()
-
-# ─── 데이터 로딩 (train만) ──────────────────────────────────
-dataset = load_dataset_from_jsonl(data_path)
-
-# ─── 학습 파라미터 설정 (eval 관련 옵션 모두 제거!) ──────
-training_args = TrainingArguments(
-    per_device_train_batch_size=2,
-    gradient_accumulation_steps=2,
-    gradient_checkpointing=True,
-    max_grad_norm=0.3,
-    num_train_epochs=15,
-    learning_rate=2e-4,
-    save_total_limit=3,
-    save_strategy="steps",
-    save_steps=200,
-    logging_dir=f"{output_dir}/logs",
-    logging_steps=10,
-    output_dir=output_dir,
-    optim="paged_adamw_32bit",
-    lr_scheduler_type="cosine",
-    warmup_ratio=0.05,
-    max_steps=2000,
-    report_to="tensorboard"
+# 1. Unsloth 모델 로딩
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name = "unsloth/Qwen3-8B",
+    max_seq_length = 2048,
+    dtype = torch.bfloat16,
+    load_in_4bit = True,        # VRAM 절약 (원하면 False로도 가능)
 )
 
-# ─── Trainer 생성 ──────────────────────────────────────────
+# 2. 데이터셋 로딩 (Huggingface Dataset)
+dataset = load_dataset("json", data_files="quiz_finetune_unsloth.jsonl", split="train")
+
+# 3. input/output을 text로 합치기 (Unsloth 권장 방식)
+def format_example(example):
+    # instruction이 필요하면 맨 앞에 추가!
+    return {"text": f"{example['input']}\n{example['output']}"}
+dataset = dataset.map(format_example)
+
+# 4. SFTTrainer 선언 (Unsloth용)
+from unsloth import SFTTrainer
 trainer = SFTTrainer(
-    model=model,
-    train_dataset=dataset,
-    args=training_args,
-    peft_config=get_lora_config(),
+    model = model,
+    tokenizer = tokenizer,
+    train_dataset = dataset,
+    max_seq_length = 2048,
+    batch_size = 2,
+    gradient_accumulation_steps = 2,
+    lr_scheduler_type = "cosine",
+    warmup_ratio = 0.05,
+    num_train_epochs = 3,
+    learning_rate = 2e-4,
+    save_steps = 200,
+    output_dir = "./unsloth_qwen3_output",
+    logging_steps = 10,
+    report_to = "tensorboard",
 )
-trainer.tokenizer = tokenizer
 
-def main():
-    trainer.train(resume_from_checkpoint=None)
-    model.save_pretrained(f"{output_dir}/final_model")
-    tokenizer.save_pretrained(f"{output_dir}/final_model")
-    print("훈련 완료 및 모델 저장됨:", output_dir)
+# 5. 학습 실행
+trainer.train()
 
-if __name__ == "__main__":
-    main()
+# 6. 모델 저장
+trainer.save_model("./unsloth_qwen3_output/final_model")
+tokenizer.save_pretrained("./unsloth_qwen3_output/final_model")

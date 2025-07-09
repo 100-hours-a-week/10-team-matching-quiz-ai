@@ -1,28 +1,38 @@
 import json
 
-input_path = "quiz_finetune_final.jsonl"
-output_path = "quiz_finetune_final_dedup.jsonl"
+# 원본 jsonl 경로
+input_path = "quiz_finetune.jsonl"         # 기존 파일명
+output_path = "quiz_finetune_unsloth.jsonl"  # 새 파일명
 
-seen_inputs = set()
-count_total = 0
-count_written = 0
+# instruction과 포맷 예시
+instruction = (
+    "아래 문장에 대해 객관식 4지선다 퀴즈 한 문제를 생성해줘. "
+    "문제, 선지, 정답 인덱스(1~4), 해설을 꼭 포함해서 아래 포맷 예시를 따르세요.\n\n"
+    "[포맷 예시]\n"
+    "난이도: 하\n"
+    "문제: ...\n"
+    "선지: [ ... ]\n"
+    "정답 인덱스: ...\n"
+    "해설: ...\n"
+)
 
-with open(input_path, "r", encoding="utf-8") as infile, \
-     open(output_path, "w", encoding="utf-8") as outfile:
-    for line in infile:
-        try:
-            data = json.loads(line)
-        except Exception as e:
-            print("⚠️ JSON decode error:", e)
-            continue
-        # input 기준으로만 중복 제거
-        key = data.get("input")
-        if key is None:
-            continue  # input이 없는 라인은 스킵
-        count_total += 1
-        if key not in seen_inputs:
-            seen_inputs.add(key)
-            outfile.write(json.dumps(data, ensure_ascii=False) + "\n")
-            count_written += 1
-
-print(f"✅ 중복 제거 완료: {count_total}줄 중 {count_written}줄만 남김!")
+with open(input_path, encoding="utf-8") as fin, open(output_path, "w", encoding="utf-8") as fout:
+    for line in fin:
+        row = json.loads(line)
+        # 기존 구조: {"input": "...", "output": {...}}
+        # output 구조 예시: {"difficulty": "...", "question": "...", "options": [...], "answer_index": 1, "explanation": "..."}
+        data = row["output"]
+        # 원하는 output 텍스트 포맷으로 변환
+        output_text = (
+            f"난이도: {data['difficulty']}\n"
+            f"문제: {data['question']}\n"
+            f"선지: {json.dumps(data['options'], ensure_ascii=False)}\n"
+            f"정답 인덱스: {data['answer_index']}\n"
+            f"해설: {data['explanation']}"
+        )
+        # instruction + 포맷예시 + 실제 문장
+        prompt = (
+            f"{instruction}\n문장: {row['input']}"
+        )
+        json.dump({"input": prompt, "output": output_text}, fout, ensure_ascii=False)
+        fout.write("\n")
