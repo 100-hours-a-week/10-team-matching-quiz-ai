@@ -1,14 +1,17 @@
 import os
 from datetime import datetime
 import torch
-from transformers import AutoModelForCausalLM, AutoTokenizer, TrainingArguments
-from transformers import logging as hf_logging
+from transformers import (
+    AutoModelForCausalLM,
+    AutoTokenizer,
+    TrainingArguments,
+    logging as hf_logging
+)
 from trl import SFTTrainer
 from peft import prepare_model_for_kbit_training, get_peft_model
-from sklearn.model_selection import train_test_split
 
 from config import get_bnb_config, get_lora_config
-from dataset import load_dataset_from_jsonl  # 함수가 Dataset 반환해야 함
+from dataset import load_dataset_from_jsonl  # 반드시 HuggingFace Dataset 반환해야 함
 
 hf_logging.set_verbosity_info()
 
@@ -36,19 +39,10 @@ tokenizer = AutoTokenizer.from_pretrained(model_name, trust_remote_code=True)
 model = get_peft_model(model, get_lora_config())
 model.print_trainable_parameters()
 
-# ─── 데이터 로딩 및 분할 ─────────────────────────────────────
-dataset = load_dataset_from_jsonl(data_path)  # Dataset 객체 반환
-# 만약 Dataset 객체가 아니라면 아래처럼 리스트 분할
-if not hasattr(dataset, 'train_test_split'):
-    # 리스트라면 Dataset.from_list로 변환 필요
-    from datasets import Dataset
-    dataset = Dataset.from_list(dataset)
+# ─── 데이터 로딩 (train만) ──────────────────────────────────
+dataset = load_dataset_from_jsonl(data_path)
 
-split = dataset.train_test_split(test_size=0.1, seed=42)
-train_data = split["train"]
-val_data = split["test"]
-
-# ─── 학습 파라미터 설정 ──────────────────────────────────────
+# ─── 학습 파라미터 설정 (eval 관련 옵션 모두 제거!) ──────
 training_args = TrainingArguments(
     per_device_train_batch_size=2,
     gradient_accumulation_steps=2,
@@ -66,27 +60,20 @@ training_args = TrainingArguments(
     lr_scheduler_type="cosine",
     warmup_ratio=0.05,
     max_steps=2000,
-    report_to="tensorboard",
-    evaluation_strategy="steps",     # ⬅️ Best 모델 선정 위한 평가 옵션
-    eval_steps=200,
-    load_best_model_at_end=True,     # ⬅️ Best checkpoint 자동 불러오기
-    metric_for_best_model="eval_loss",
-    greater_is_better=False,
+    report_to="tensorboard"
 )
 
 # ─── Trainer 생성 ──────────────────────────────────────────
 trainer = SFTTrainer(
     model=model,
-    train_dataset=train_data,
-    eval_dataset=val_data,
+    train_dataset=dataset,
     args=training_args,
     peft_config=get_lora_config(),
 )
 trainer.tokenizer = tokenizer
 
 def main():
-    trainer.train(resume_from_checkpoint="./qwen3_lora_output_20250707_051148/checkpoint-1000")
-    # Best checkpoint 자동 로드됨!
+    trainer.train(resume_from_checkpoint=None)
     model.save_pretrained(f"{output_dir}/final_model")
     tokenizer.save_pretrained(f"{output_dir}/final_model")
     print("훈련 완료 및 모델 저장됨:", output_dir)
