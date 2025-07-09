@@ -28,7 +28,7 @@ model = FastLanguageModel.get_peft_model(
 )
 
 # 데이터셋 로딩 (jsonl → Huggingface Dataset)
-dataset = load_dataset("json", data_files="quiz_finetune_unsloth_alpaca.jsonl", split="train")
+dataset = load_dataset("json", data_files="quiz_finetune_unsloth.jsonl", split="train")
 
 # Alpaca prompt 포맷 함수
 EOS_TOKEN = tokenizer.eos_token
