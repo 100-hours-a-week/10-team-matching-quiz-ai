@@ -98,9 +98,6 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
             logger.error(f"Unhandled error processing message {message.message_id if message else 'UnknownMsg'}: {e}", exc_info=True)
             await message.reject(requeue=False)
 
-# ...existing code... (main_stt_feedback_worker 함수는 그대로 유지)
-
-
 async def main_stt_feedback_worker():
     # Load models once at startup
     logger.info("STT Feedback Worker: Initializing WhisperX model...")

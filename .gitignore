@@ -96,3 +96,5 @@ dataset/
 .pyright/
 .mypy_cache/
 .env_for_api
+.pytest_cache
+.coverage
