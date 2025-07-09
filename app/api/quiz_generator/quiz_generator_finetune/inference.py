@@ -16,16 +16,22 @@ def load_model(model_path, base_model="Qwen/Qwen3-8B"):
     model.eval()
     return tokenizer, model
 
-def generate_single_quiz(tokenizer, model, prompt, max_new_tokens=512):
-    tokens = tokenizer(prompt, return_tensors="pt", padding=True).to(model.device)
+def batch_generate_quizzes(tokenizer, model, prompts, instruction="", max_new_tokens=512):
+    prompts_with_instruction = [
+        f"{instruction}\n\n{p}" if instruction else p for p in prompts
+    ]
+    tokens = tokenizer(prompts_with_instruction, return_tensors="pt", padding=True).to(model.device)
     with torch.no_grad():
+        start = time.time()
         outputs = model.generate(
             **tokens,
             max_new_tokens=max_new_tokens,
             do_sample=False,
             temperature=0.7
         )
-    return tokenizer.decode(outputs[0], skip_special_tokens=True)
+        elapsed = time.time() - start
+    decoded = [tokenizer.decode(o, skip_special_tokens=True) for o in outputs]
+    return decoded, elapsed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -33,16 +39,31 @@ if __name__ == "__main__":
     parser.add_argument("--max_new_tokens", type=int, default=512, help="최대 출력 토큰 수")
     args = parser.parse_args()
 
-    # 질문 리스트와 RAG 문장 리스트 (예시)
+    # 지시문 (포맷 예시 포함)
+    instruction = (
+        "아래 문장에 대해 객관식 4지선다 퀴즈 한 문제를 생성해줘. "
+        "문제, 선지, 정답 인덱스(1~4), 해설을 꼭 포함해서 아래 포맷 예시를 따르세요.\n"
+        "난이도: 하\n"
+        "문제: ...\n"
+        "선지: [ ... ]\n"
+        "정답 인덱스: ...\n"
+        "해설: ...\n"
+    )
+
     question_list = [
         "파이썬의 대표적인 특징은 무엇인가요?",
         "딥러닝과 머신러닝의 차이점을 설명하세요.",
         "클라우드 컴퓨팅의 장점은 무엇인가요?",
+        "RAG의 개념을 설명해 주세요.",
+        "SQL과 NoSQL의 차이점을 말해 주세요."
     ]
+
     rag_sentences = [
-        "파이썬은 간결한 문법과 다양한 라이브러리를 제공하며, 초보자도 쉽게 배울 수 있는 프로그래밍 언어입니다.",
-        "딥러닝은 인공신경망을 기반으로 하는 머신러닝의 한 분야이며, 데이터로부터 자동으로 특징을 학습합니다.",
-        "클라우드 컴퓨팅은 비용 절감과 확장성, 유연한 리소스 할당이 강점입니다.",
+        "파이썬은 간결한 문법과 다양한 라이브러리를 제공하여, 초보자도 쉽게 배울 수 있는 언어입니다.",
+        "딥러닝은 대량의 데이터를 처리하고, 자동으로 특징을 추출하는 머신러닝의 하위 분야입니다.",
+        "클라우드 컴퓨팅은 유연한 리소스 할당과 비용 절감, 무한한 확장성을 제공합니다.",
+        "RAG는 외부 지식 검색 결과를 활용해 정답을 생성하는 생성형 AI 구조입니다.",
+        "SQL은 관계형 데이터베이스, NoSQL은 비정형 데이터에 최적화된 데이터베이스입니다."
     ]
 
     print("========== [QUIZ GENERATOR INFERENCE START] ==========")
@@ -50,44 +71,30 @@ if __name__ == "__main__":
     tokenizer, model = load_model(args.model_dir)
 
     total_start = time.time()
-    results = []
-    used_prompts = set()
-
-    q_len = len(question_list)
-    r_len = len(rag_sentences)
+    # --- question, rag 번갈아가며 최대 10개 모으기 ---
+    prompts = []
     i = 0
-
-    # 최대 10개까지 번갈아 생성(질문→rag→질문→...)
-    while len(results) < 10:
-        if i % 2 == 0:
-            prompt = question_list[(i // 2) % q_len]
-        else:
-            prompt = rag_sentences[(i // 2) % r_len]
-
-        if prompt in used_prompts:
-            i += 1
-            continue
-        used_prompts.add(prompt)
-
-        start = time.time()
-        quiz = generate_single_quiz(
-            tokenizer, model, prompt,
-            max_new_tokens=args.max_new_tokens
-        )
-        elapsed = time.time() - start
-        print(f"[{len(results)+1}] {prompt}\n---\n{quiz}\n[소요 시간: {elapsed:.2f}초]\n")
-        results.append({"prompt": prompt, "quiz": quiz, "elapsed": elapsed})
+    while len(prompts) < 10:
+        if i < len(question_list):
+            prompts.append(question_list[i])
+        if len(prompts) < 10 and i < len(rag_sentences):
+            prompts.append(rag_sentences[i])
         i += 1
+        if i >= max(len(question_list), len(rag_sentences)):
+            break
 
-    print(f"\n[INFO] 전체 소요 시간: {time.time() - total_start:.2f}초")
+    # batch inference
+    results, batch_time = batch_generate_quizzes(
+        tokenizer, model,
+        prompts=prompts,
+        instruction=instruction,
+        max_new_tokens=args.max_new_tokens
+    )
+    print(f"\n[INFO] 전체 {len(results)}개 퀴즈 생성에 걸린 시간: {batch_time:.2f}초")
     print("========== [QUIZ GENERATOR INFERENCE END] ==========")
 
-    # 👇 최종 생성된 퀴즈 깔끔하게 출력
-    print("\n========== [최종 10개 퀴즈 결과만 정리] ==========")
-    for idx, item in enumerate(results, 1):
-        print(f"\n--- Quiz {idx} ---")
-        print(f"질문/문장: {item['prompt']}")
-        print(f"생성 퀴즈:\n{item['quiz']}")
-        print(f"생성 시간: {item['elapsed']:.2f}초")
+    print("\n========== [최종 생성된 퀴즈] ==========")
+    for idx, quiz in enumerate(results, 1):
+        print(f"\n--- Quiz {idx} ---\n{quiz}")
 
-    print("\n==============================================")
+    print("\n========================================")
