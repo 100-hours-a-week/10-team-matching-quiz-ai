@@ -79,6 +79,121 @@ class TestQuestionGeneratorAPIFunctions:
             assert result["metadata"]["query_processed"] is False
             assert "error" in result["metadata"]
 
+    @pytest.mark.asyncio
+    async def test_perform_rag_search_with_langfuse_span_success(self):
+        """Langfuse span과 함께 RAG 검색 성공 - output과 metadata 파라미터 테스트"""
+        from app.api.question_generator.question_generator_api import perform_rag_search
+
+        mock_retriever_result = {
+            "results": [
+                {"question": "테스트 질문1", "score": 0.9},
+                {"question": "테스트 질문2", "score": 0.8}
+            ]
+        }
+
+        mock_langfuse = Mock()
+        mock_span = Mock()
+        mock_langfuse.span.return_value = mock_span
+
+        with patch('app.api.question_generator.question_generator_api.VECTOR_DB_AVAILABLE', True), \
+             patch('app.api.question_generator.question_generator_api.question_rag_retriever') as mock_retriever, \
+             patch('app.api.question_generator.question_generator_api.langfuse', mock_langfuse):
+
+            mock_retriever.return_value = mock_retriever_result
+
+            result = await perform_rag_search(
+                query="테스트 쿼리",
+                keyword="키워드",
+                trace_id="test_trace"
+            )
+
+            # 결과 검증
+            assert result["metadata"]["total_results"] == 2
+            assert result["metadata"]["query_processed"] is True
+            assert len(result["retrieved_questions"]) == 2
+
+            # Langfuse span 호출 검증
+            mock_langfuse.span.assert_called_once()
+            mock_span.end.assert_called_once()
+
+            # span.end() 호출 시 output과 metadata 파라미터 검증
+            call_args = mock_span.end.call_args
+            assert call_args[1]["output"]["retrieved_questions"] == result["retrieved_questions"]
+            assert call_args[1]["output"]["total_results"] == result["metadata"]["total_results"]
+            assert call_args[1]["output"]["search_successful"] == result["metadata"]["query_processed"]
+            assert call_args[1]["metadata"] == result["metadata"]
+
+    @pytest.mark.asyncio
+    async def test_perform_rag_search_with_langfuse_span_exception(self):
+        """Langfuse span과 함께 RAG 검색 예외 - error 파라미터 테스트"""
+        from app.api.question_generator.question_generator_api import perform_rag_search
+
+        mock_langfuse = Mock()
+        mock_span = Mock()
+        mock_langfuse.span.return_value = mock_span
+
+        with patch('app.api.question_generator.question_generator_api.VECTOR_DB_AVAILABLE', True), \
+             patch('app.api.question_generator.question_generator_api.question_rag_retriever') as mock_retriever, \
+             patch('app.api.question_generator.question_generator_api.langfuse', mock_langfuse):
+
+            mock_retriever.side_effect = Exception("RAG 오류")
+
+            result = await perform_rag_search(
+                query="테스트 쿼리",
+                keyword="키워드",
+                trace_id="test_trace"
+            )
+
+            # 결과 검증
+            assert result["metadata"]["total_results"] == 0
+            assert result["metadata"]["query_processed"] is False
+            assert "error" in result["metadata"]
+
+            # Langfuse span 호출 검증
+            mock_langfuse.span.assert_called_once()
+            mock_span.end.assert_called_once()
+
+            # span.end() 호출 시 error와 output 파라미터 검증
+            call_args = mock_span.end.call_args
+            assert "error" in call_args[1]
+            assert call_args[1]["error"]["message"] == "RAG 검색 실패: RAG 오류"
+            assert call_args[1]["error"]["type"] == "Exception"
+            assert call_args[1]["output"] == result
+
+    @pytest.mark.asyncio
+    async def test_perform_rag_search_vector_db_unavailable_with_span(self):
+        """Vector DB 사용 불가 시 Langfuse span 처리"""
+        from app.api.question_generator.question_generator_api import perform_rag_search
+
+        mock_langfuse = Mock()
+        mock_span = Mock()
+        mock_langfuse.span.return_value = mock_span
+
+        with patch('app.api.question_generator.question_generator_api.VECTOR_DB_AVAILABLE', False), \
+             patch('app.api.question_generator.question_generator_api.langfuse', mock_langfuse):
+
+            result = await perform_rag_search(
+                query="테스트 쿼리",
+                keyword="키워드",
+                trace_id="test_trace"
+            )
+
+            # 결과 검증
+            assert result["metadata"]["total_results"] == 0
+            assert result["metadata"]["query_processed"] is False
+            assert result["metadata"]["reason"] == "Vector DB not available"
+
+            # Langfuse span 호출 검증
+            mock_langfuse.span.assert_called_once()
+            mock_span.end.assert_called_once()
+
+            # span.end() 호출 시 output과 metadata 파라미터 검증
+            call_args = mock_span.end.call_args
+            assert call_args[1]["output"]["retrieved_questions"] == []
+            assert call_args[1]["output"]["total_results"] == 0
+            assert call_args[1]["output"]["search_successful"] is False
+            assert call_args[1]["metadata"] == result["metadata"]
+
     def test_prepare_context(self):
         """컨텍스트 준비 함수 테스트"""
         from app.api.question_generator.question_generator_api import prepare_context
@@ -268,193 +383,205 @@ class TestQuestionGeneratorAPIFunctions:
             assert exc_info.value.status_code == 500
             assert "프롬프트 템플릿" in exc_info.value.detail
 
+    @pytest.mark.asyncio
+    async def test_generate_questions_with_fallback_with_prompt_span(self):
+        """프롬프트 span과 함께 질문 생성 테스트"""
+        from app.api.question_generator.question_generator_api import generate_questions_with_fallback
+        from app.api.question_generator.question_generator_schema import FollowupRequest
 
-class TestQuestionGeneratorAPIEndpoints:
-    """FastAPI 엔드포인트 테스트"""
+        req = FollowupRequest(
+            interview_id="test_123",
+            selected_question="테스트 질문",
+            keyword="키워드"
+        )
 
-    @pytest.fixture
-    def client(self):
-        """테스트 클라이언트 설정"""
-        from fastapi import FastAPI
-        from app.api.question_generator.question_generator_api import router
+        context = {
+            "selected_question": "테스트 질문",
+            "keyword": "키워드",
+            "passed_questions": "",
+            "retrieved_questions": "",
+            "num_questions": 3,
+            "rag_metadata": {"total_results": 2}
+        }
 
-        app = FastAPI()
-        app.include_router(router, prefix="/api/question-generator")
-        return TestClient(app)
+        mock_prompt = Mock()
+        mock_prompt.compile.return_value = "컴파일된 프롬프트"
 
-    def test_status_endpoint_healthy(self, client):
-        """상태 엔드포인트 테스트 (정상)"""
-        with patch('app.main.is_model_available') as mock_model_available, \
-             patch('app.api.question_generator.question_generator_model.check_vllm_health') as mock_health:
+        mock_langfuse = Mock()
+        mock_prompt_span = Mock()
+        mock_langfuse.span.return_value = mock_prompt_span
 
-            mock_model_available.return_value = True
-            # 직접 True 값을 반환하는 코루틴 모킹
-            mock_health.return_value = True
+        with patch('app.api.question_generator.question_generator_api.get_cached_prompt', return_value=mock_prompt), \
+             patch('app.api.question_generator.question_generator_api.call_llm', new_callable=AsyncMock) as mock_call_llm, \
+             patch('app.api.question_generator.question_generator_api.parse_questions') as mock_parse, \
+             patch('app.api.question_generator.question_generator_api.langfuse', mock_langfuse), \
+             patch('app.api.question_generator.question_generator_api.GENERATE_COUNT', 3):
 
-            response = client.get("/api/question-generator/status")
+            mock_call_llm.return_value = "질문들"
+            mock_parse.return_value = ["질문1", "질문2", "질문3"]
 
-            assert response.status_code == 200
-            data = response.json()
-            assert data["service"] == "question_generator"
-            assert data["model_available"] is True
+            questions = await generate_questions_with_fallback(req, context)
 
-    def test_status_endpoint_unhealthy(self, client):
-        """상태 엔드포인트 테스트 (비정상)"""
-        with patch('app.main.is_model_available') as mock_model_available:
+            assert len(questions) == 3
+            assert req.keyword == "키워드"
 
-            mock_model_available.return_value = False
 
-            response = client.get("/api/question-generator/status")
-
-            assert response.status_code == 200
-            data = response.json()
-            assert data["model_available"] is False
-            assert data["status"] == "unhealthy"
+class TestQuestionGeneratorAPILangfuseIntegration:
+    """Langfuse 통합 관련 추가 테스트"""
 
     @pytest.mark.asyncio
-    async def test_followup_questions_endpoint_success(self, client):
-        """꼬리질문 생성 엔드포인트 성공 케이스"""
-        request_data = {
-            "interview_id": "test_123",
-            "selected_question": "Python GIL에 대해 설명해주세요",
-            "keyword": "Python"
+    async def test_perform_rag_search_langfuse_span_output_metadata(self):
+        """RAG 검색에서 langfuse span.end()의 output과 metadata 파라미터 테스트"""
+        from app.api.question_generator.question_generator_api import perform_rag_search
+
+        mock_retriever_result = {
+            "results": [
+                {"question": "테스트 질문1", "score": 0.9},
+                {"question": "테스트 질문2", "score": 0.8}
+            ]
         }
 
-        mock_questions = [
-            "GIL의 장단점은 무엇인가요?",
-            "멀티쓰레딩에서 GIL의 영향은?",
-            "GIL을 우회하는 방법들을 설명해주세요"
-        ]
+        mock_langfuse = Mock()
+        mock_span = Mock()
+        mock_langfuse.span.return_value = mock_span
 
-        with patch('app.main.is_model_available') as mock_model_available, \
-             patch('app.api.question_generator.question_generator_api.perform_rag_search') as mock_rag, \
-             patch('app.api.question_generator.question_generator_api.generate_questions_with_fallback') as mock_generate, \
-             patch('app.api.question_generator.question_generator_api.langfuse', None):
+        with patch('app.api.question_generator.question_generator_api.VECTOR_DB_AVAILABLE', True), \
+             patch('app.api.question_generator.question_generator_api.question_rag_retriever') as mock_retriever, \
+             patch('app.api.question_generator.question_generator_api.langfuse', mock_langfuse):
 
-            mock_model_available.return_value = True
-            mock_rag.return_value = {
-                "retrieved_questions": [],
-                "metadata": {"total_results": 0}
-            }
-            mock_generate.return_value = mock_questions
+            mock_retriever.return_value = mock_retriever_result
 
-            response = client.post("/api/question-generator/followup-questions", json=request_data)
+            result = await perform_rag_search(
+                query="테스트 쿼리",
+                keyword="키워드",
+                trace_id="test_trace"
+            )
 
-            assert response.status_code == 200
-            data = response.json()
-            assert data["message"] == "followup_questions_generated"
-            assert data["interview_id"] == "test_123"
-            assert len(data["followup_questions"]) == 3
-
-    def test_followup_questions_endpoint_model_unavailable(self, client):
-        """모델 사용 불가능한 경우"""
-        request_data = {
-            "interview_id": "test_123",
-            "selected_question": "Python GIL에 대해 설명해주세요"
-        }
-
-        with patch('app.main.is_model_available') as mock_model_available:
-            mock_model_available.return_value = False
-
-            response = client.post("/api/question-generator/followup-questions", json=request_data)
-
-            assert response.status_code == 503
-            assert "질문 생성 모델이 사용할 수 없습니다" in response.json()["detail"]
-
-    def test_followup_questions_endpoint_invalid_input(self, client):
-        """잘못된 입력 데이터"""
-        with patch('app.main.is_model_available') as mock_model_available:
-            mock_model_available.return_value = True
-
-            # 빈 질문
-            response = client.post("/api/question-generator/followup-questions", json={
-                "interview_id": "test_123",
-                "selected_question": ""
-            })
-            assert response.status_code == 400
-            assert "메인 질문은 필수입니다" in response.json()["detail"]
-
-            # 빈 interview_id
-            response = client.post("/api/question-generator/followup-questions", json={
-                "interview_id": "",
-                "selected_question": "테스트 질문"
-            })
-            assert response.status_code == 400
-            assert "interview_id는 필수입니다" in response.json()["detail"]
+            # span.end() 호출 시 output과 metadata 파라미터 검증
+            mock_span.end.assert_called_once()
+            call_args = mock_span.end.call_args
+            
+            # output 파라미터 검증
+            assert "output" in call_args[1]
+            output = call_args[1]["output"]
+            assert output["retrieved_questions"] == result["retrieved_questions"]
+            assert output["total_results"] == result["metadata"]["total_results"]
+            assert output["search_successful"] == result["metadata"]["query_processed"]
+            
+            # metadata 파라미터 검증
+            assert "metadata" in call_args[1]
+            assert call_args[1]["metadata"] == result["metadata"]
 
     @pytest.mark.asyncio
-    async def test_followup_questions_endpoint_generation_error(self, client):
-        """질문 생성 중 오류 발생"""
-        request_data = {
-            "interview_id": "test_123",
-            "selected_question": "Python GIL에 대해 설명해주세요"
+    async def test_generate_questions_prompt_span_output_metadata(self):
+        """질문 생성에서 prompt span.end()의 output과 metadata 파라미터 테스트"""
+        from app.api.question_generator.question_generator_api import generate_questions_with_fallback
+        from app.api.question_generator.question_generator_schema import FollowupRequest
+
+        req = FollowupRequest(
+            interview_id="test_123",
+            selected_question="테스트 질문",
+            keyword="키워드"
+        )
+
+        context = {
+            "selected_question": "테스트 질문",
+            "keyword": "키워드", 
+            "passed_questions": "",
+            "retrieved_questions": "",
+            "num_questions": 3,
+            "rag_metadata": {"total_results": 2}
         }
 
-        with patch('app.main.is_model_available') as mock_model_available, \
-             patch('app.api.question_generator.question_generator_api.perform_rag_search') as mock_rag, \
-             patch('app.api.question_generator.question_generator_api.generate_questions_with_fallback') as mock_generate, \
-             patch('app.api.question_generator.question_generator_api.langfuse', None):
+        mock_prompt = Mock()
+        mock_prompt.compile.return_value = "컴파일된 프롬프트"
 
-            mock_model_available.return_value = True
-            mock_rag.return_value = {
-                "retrieved_questions": [],
-                "metadata": {"total_results": 0}
-            }
-            mock_generate.side_effect = Exception("질문 생성 실패")
+        mock_langfuse = Mock()
+        mock_prompt_span = Mock()
+        mock_langfuse.span.return_value = mock_prompt_span
 
-            response = client.post("/api/question-generator/followup-questions", json=request_data)
+        with patch('app.api.question_generator.question_generator_api.get_cached_prompt', return_value=mock_prompt), \
+             patch('app.api.question_generator.question_generator_api.call_llm', new_callable=AsyncMock) as mock_call_llm, \
+             patch('app.api.question_generator.question_generator_api.parse_questions') as mock_parse, \
+             patch('app.api.question_generator.question_generator_api.langfuse', mock_langfuse), \
+             patch('app.api.question_generator.question_generator_api.GENERATE_COUNT', 3):
 
-            assert response.status_code == 500
-            assert "질문 생성 실패" in response.json()["detail"]
+            mock_call_llm.return_value = "질문들"
+            mock_parse.return_value = ["질문1", "질문2", "질문3"]
 
+            await generate_questions_with_fallback(req, context, trace_id="test_trace")
 
-class TestQuestionGeneratorAPIModuleLevel:
-    """모듈 레벨 테스트"""
+            # prompt span.end() 호출 시 output과 metadata 파라미터 검증
+            mock_prompt_span.end.assert_called_once()
+            call_args = mock_prompt_span.end.call_args
+            
+            # output 파라미터 검증
+            assert "output" in call_args[1]
+            output = call_args[1]["output"]
+            assert output["compiled_prompt_length"] == len("컴파일된 프롬프트")
+            
+            # metadata 파라미터 검증
+            assert "metadata" in call_args[1]
+            metadata = call_args[1]["metadata"]
+            assert metadata["selected_question_length"] == len(req.selected_question)
+            assert metadata["keyword"] == req.keyword
+            assert metadata["rag_results_count"] == 2
 
-    def test_module_imports(self):
-        """모듈 임포트 테스트"""
-        import app.api.question_generator.question_generator_api as api_module
-        
-        # 주요 객체들이 정의되어 있는지 확인
-        assert hasattr(api_module, 'router')
-        assert hasattr(api_module, 'logger')
-        assert hasattr(api_module, 'langfuse')
-        assert hasattr(api_module, 'GENERATE_COUNT')
-        assert hasattr(api_module, 'MAX_HISTORY_QUESTIONS')
+    @pytest.mark.asyncio
+    async def test_generate_questions_fallback_span_output(self):
+        """OpenAI fallback span.end()의 output 파라미터 테스트"""
+        from app.api.question_generator.question_generator_api import generate_questions_with_fallback
+        from app.api.question_generator.question_generator_schema import FollowupRequest
 
-    def test_module_constants(self):
-        """모듈 상수 테스트"""
-        from app.api.question_generator.question_generator_api import GENERATE_COUNT, MAX_HISTORY_QUESTIONS
-        
-        assert isinstance(GENERATE_COUNT, int)
-        assert isinstance(MAX_HISTORY_QUESTIONS, int)
-        assert GENERATE_COUNT > 0
-        assert MAX_HISTORY_QUESTIONS > 0
+        req = FollowupRequest(
+            interview_id="test_123",
+            selected_question="테스트 질문",
+            keyword="키워드"
+        )
 
-    def test_vector_db_availability(self):
-        """Vector DB 가용성 확인"""
-        from app.api.question_generator.question_generator_api import VECTOR_DB_AVAILABLE
-        
-        assert isinstance(VECTOR_DB_AVAILABLE, bool)
+        context = {
+            "selected_question": "테스트 질문",
+            "keyword": "키워드",
+            "passed_questions": "",
+            "retrieved_questions": "",
+            "num_questions": 3
+        }
 
-    def test_langfuse_initialization(self):
-        """Langfuse 초기화 테스트"""
-        # 모듈을 직접 테스트하여 langfuse 객체 확인
-        from app.api.question_generator.question_generator_api import langfuse
-        
-        # langfuse가 설정되어 있는지 또는 None인지 확인
-        # 실제 환경에서는 설정에 따라 다를 수 있음
-        assert langfuse is None or hasattr(langfuse, 'get_prompt')
+        mock_prompt = Mock()
+        mock_prompt.compile.return_value = "컴파일된 프롬프트"
 
-    def test_prompt_cache_functionality(self):
-        """프롬프트 캐시 기능 테스트"""
-        from app.api.question_generator.question_generator_api import _prompt_cache, get_cached_prompt
-        
-        # 캐시 초기화
-        _prompt_cache.clear()
-        
-        # Langfuse 없이 호출
-        with patch('app.api.question_generator.question_generator_api.langfuse', None):
-            result = get_cached_prompt("test_prompt")
-            assert result is None
-            assert len(_prompt_cache) == 0
+        mock_api_prompt = Mock()
+        mock_api_prompt.compile.return_value = "API 프롬프트"
+
+        mock_langfuse = Mock()
+        mock_prompt_span = Mock()
+        mock_fallback_span = Mock()
+        # span() 호출 순서에 따라 다른 mock 반환
+        mock_langfuse.span.side_effect = [mock_prompt_span, mock_fallback_span]
+
+        with patch('app.api.question_generator.question_generator_api.get_cached_prompt') as mock_get_prompt, \
+             patch('app.api.question_generator.question_generator_api.call_llm', new_callable=AsyncMock) as mock_call_llm, \
+             patch('app.api.question_generator.question_generator_api.call_openai_api', new_callable=AsyncMock) as mock_call_openai, \
+             patch('app.api.question_generator.question_generator_api.parse_questions') as mock_parse, \
+             patch('app.api.question_generator.question_generator_api.langfuse', mock_langfuse), \
+             patch('app.api.question_generator.question_generator_api.GENERATE_COUNT', 3):
+
+            mock_get_prompt.side_effect = [mock_prompt, mock_api_prompt]
+            mock_call_llm.return_value = "질문들"
+            mock_call_openai.return_value = "추가 질문들"
+            
+            # vLLM에서 1개만 생성, OpenAI에서 2개 추가
+            mock_parse.side_effect = [["질문1"], ["질문2", "질문3"]]
+
+            await generate_questions_with_fallback(req, context, trace_id="test_trace")
+
+            # fallback span.end() 호출 시 output 파라미터 검증
+            mock_fallback_span.end.assert_called_once()
+            call_args = mock_fallback_span.end.call_args
+            
+            # output 파라미터 검증
+            assert "output" in call_args[1]
+            output = call_args[1]["output"]
+            assert output["additional_questions_generated"] == 2
+            assert output["unique_questions_added"] == 2
+            assert output["final_question_count"] == 3

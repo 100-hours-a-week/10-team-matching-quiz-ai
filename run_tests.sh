@@ -11,7 +11,11 @@ export ENABLED_MODELS="question_generator"
 
 # 테스트 의존성 설치 확인
 echo "테스트 의존성 확인 중..."
-pip install -r requirements-test.txt
+# pytest-cov가 설치되어 있는지 확인하고 없으면 설치
+python -c "import pytest_cov; print('pytest-cov가 이미 설치되어 있습니다.')" 2>/dev/null || {
+    echo "pytest-cov 설치 중..."
+    pip install pytest-cov
+}
 
 # 테스트 실행 및 커버리지 측정
 echo "테스트 실행 중..."
