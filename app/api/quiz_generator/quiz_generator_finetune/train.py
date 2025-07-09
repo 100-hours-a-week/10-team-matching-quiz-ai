@@ -4,10 +4,10 @@ from datasets import load_dataset
 
 # 1. Unsloth 모델 로딩
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "Qwen/Qwen3-8B",
+    model_name = "unsloth/Qwen3-8B",   # ✅ 요걸로 하세요!
     max_seq_length = 2048,
     dtype = torch.bfloat16,
-    load_in_4bit = True,        # VRAM 절약 (원하면 False로도 가능)
+    load_in_4bit = True,
 )
 
 # 2. 데이터셋 로딩 (Huggingface Dataset)
