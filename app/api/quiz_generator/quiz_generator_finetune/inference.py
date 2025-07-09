@@ -16,27 +16,14 @@ def load_model(model_path, base_model="Qwen/Qwen3-8B"):
     model.eval()
     return tokenizer, model
 
-def generate_single_quiz(tokenizer, model, prompt, use_chat_template=True, max_new_tokens=512):
-    # chat_template 강제 적용
-    if use_chat_template:
-        messages = [{"role": "user", "content": prompt}]
-        # Qwen3 공식 chat template + reasoning 억제!
-        full_prompt = tokenizer.apply_chat_template(
-            messages,
-            tokenize=False,
-            add_generation_prompt=True,
-            enable_thinking=False  # reasoning 생략 옵션 (Qwen 공식)
-        )
-    else:
-        full_prompt = prompt
-
-    tokens = tokenizer(full_prompt, return_tensors="pt", padding=True).to(model.device)
+def generate_single_quiz(tokenizer, model, prompt, max_new_tokens=512):
+    tokens = tokenizer(prompt, return_tensors="pt", padding=True).to(model.device)
     with torch.no_grad():
         outputs = model.generate(
             **tokens,
             max_new_tokens=max_new_tokens,
             do_sample=False,
-            temperature=0.1  # 낮출수록 "그대로 출력"
+            temperature=0.7
         )
     return tokenizer.decode(outputs[0], skip_special_tokens=True)
 
@@ -44,12 +31,9 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--model_dir", type=str, required=True, help="훈련된 모델 경로 (ex: ...)")
     parser.add_argument("--max_new_tokens", type=int, default=512, help="최대 출력 토큰 수")
-    parser.add_argument("--no_chat_template", action="store_true", help="chat template 사용 안 함")
     args = parser.parse_args()
 
-    # instruction은 아예 비움!
-    instruction = ""
-
+    # 질문 리스트와 RAG 문장 리스트 (예시)
     question_list = [
         "파이썬의 대표적인 특징은 무엇인가요?",
         "딥러닝과 머신러닝의 차이점을 설명하세요.",
@@ -68,15 +52,18 @@ if __name__ == "__main__":
     total_start = time.time()
     results = []
     used_prompts = set()
+
     q_len = len(question_list)
     r_len = len(rag_sentences)
     i = 0
 
+    # 최대 10개까지 번갈아 생성(질문→rag→질문→...)
     while len(results) < 10:
         if i % 2 == 0:
             prompt = question_list[(i // 2) % q_len]
         else:
             prompt = rag_sentences[(i // 2) % r_len]
+
         if prompt in used_prompts:
             i += 1
             continue
@@ -85,16 +72,22 @@ if __name__ == "__main__":
         start = time.time()
         quiz = generate_single_quiz(
             tokenizer, model, prompt,
-            use_chat_template=(not args.no_chat_template),  # --no_chat_template로 끌 수 있음
             max_new_tokens=args.max_new_tokens
         )
         elapsed = time.time() - start
         print(f"[{len(results)+1}] {prompt}\n---\n{quiz}\n[소요 시간: {elapsed:.2f}초]\n")
-        results.append(quiz)
+        results.append({"prompt": prompt, "quiz": quiz, "elapsed": elapsed})
         i += 1
 
     print(f"\n[INFO] 전체 소요 시간: {time.time() - total_start:.2f}초")
     print("========== [QUIZ GENERATOR INFERENCE END] ==========")
-    print("최종 10개 퀴즈만 파싱 결과:")
-    for idx, quiz in enumerate(results):
-        print(f"\n--- Quiz {idx+1} ---\n{quiz}")
+
+    # 👇 최종 생성된 퀴즈 깔끔하게 출력
+    print("\n========== [최종 10개 퀴즈 결과만 정리] ==========")
+    for idx, item in enumerate(results, 1):
+        print(f"\n--- Quiz {idx} ---")
+        print(f"질문/문장: {item['prompt']}")
+        print(f"생성 퀴즈:\n{item['quiz']}")
+        print(f"생성 시간: {item['elapsed']:.2f}초")
+
+    print("\n==============================================")
