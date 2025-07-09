@@ -27,7 +27,7 @@ with open(input_path, encoding="utf-8") as fin, open(output_path, "w", encoding=
             f"난이도: {data['difficulty']}\n"
             f"문제: {data['question']}\n"
             f"선지: {json.dumps(data['options'], ensure_ascii=False)}\n"
-            f"정답 인덱스: {data['answer_index']}\n"
+            f"정답 인덱스: {data['output']['answer_index']}\n"
             f"해설: {data['explanation']}"
         )
         # instruction + 포맷예시 + 실제 문장
