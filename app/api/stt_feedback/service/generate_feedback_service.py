@@ -6,16 +6,17 @@ import json # JSON 응답 파싱을 위해 import
 
 logger = logging.getLogger("stt")
 
-# Gemini API 키 설정
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-if not GEMINI_API_KEY:
-    raise ValueError("GEMINI_API_KEY 환경변수가 설정되지 않았습니다.")
-
-# 버전용 초기화 (딱 0.8.5 한정)
-genai.configure(api_key=GEMINI_API_KEY)
 
 # LLM 프롬프트 고도화 및 Gemini 피드백 생성
 def generate_feedback_gemini(question: str, answer: str) -> dict:
+
+    # Gemini API 키 설정
+    api_key = os.getenv("STT_GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("STT_GEMINI_API_KEY 환경변수가 설정되지 않았습니다.")
+    
+    genai.configure(api_key=api_key) 
+
     # 프롬프트: '신입 백엔드 개발자' 면접관 역할을 명확히 하고, 상세한 JSON 출력을 요구합니다.
     prompt = f"""
     당신은 10년차 시니어 백엔드 개발자이자, 개발자 면접관입니다.
@@ -114,9 +115,9 @@ def generate_feedback_gemini(question: str, answer: str) -> dict:
 """
 # --- 테스트 코드 예시 ---
 if __name__ == "__main__":
-    if not os.getenv("GEMINI_API_KEY"):
-        print("경고: 'GEMINI_API_KEY' 환경 변수가 설정되지 않았습니다.")
-        print("API 키를 설정한 후 다시 실행해주세요. (예: export GEMINI_API_KEY='YOUR_API_KEY')")
+    if not os.getenv("STT_GEMINI_API_KEY"):
+        print("경고: 'STT_GEMINI_API_KEY' 환경 변수가 설정되지 않았습니다.")
+        print("API 키를 설정한 후 다시 실행해주세요. (예: export STT_GEMINI_API_KEY='YOUR_API_KEY')")
         exit()
 
     logging.basicConfig(level=logging.INFO)
