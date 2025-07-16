@@ -5,6 +5,7 @@ from app.config import rabbitmq_config
 import logging
 import sys
 import time
+import json
 from langfuse import Langfuse
 
 # Core logic components
