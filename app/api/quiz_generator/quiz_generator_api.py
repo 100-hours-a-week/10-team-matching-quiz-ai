@@ -227,7 +227,7 @@ def process_quiz_generation(request: FollowupRequest) -> dict:
             output={
                 "parsed_quiz_count": len(parsed_list),
                 "parsing_successful": True,
-                "parsed_quizzes_sample": parsed_list[:2] if len(parsed_list) >= 2 else parsed_list
+                "parsed_quizzes": json.dumps(parsed_list, ensure_ascii=False, indent=2)
             },
             metadata={
                 "execution_time_seconds": parsing_execution_time,
@@ -303,7 +303,11 @@ def process_quiz_generation(request: FollowupRequest) -> dict:
 
         request_execution_time = time.time() - request_start_time
         trace.update(
-            output={"final_quiz_count": len(quiz_items), "interview_id_processed": quiz_data_obj.interview_id},
+            output={
+                "final_quiz_count": len(quiz_items), 
+                "interview_id_processed": quiz_data_obj.interview_id,
+                "final_quizzes": json.dumps([item.model_dump() for item in quiz_items], ensure_ascii=False, indent=2)
+            },
             metadata={"total_execution_time_seconds": request_execution_time}
         )
         

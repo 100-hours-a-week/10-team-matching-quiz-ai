@@ -16,7 +16,6 @@ if not logger.hasHandlers():
     logger.addHandler(handler)
 
 
-# 생성된 문자열(raw_options)을 4지선다 리스트 형태로 변환
 def parse_choices(raw_options: str) -> List[str]:
     """
     문자열 형태의 선지(raw_options)를 4지선다 리스트 형태로 파싱
@@ -43,7 +42,7 @@ def parse_choices(raw_options: str) -> List[str]:
     logger.warning("선지 파싱 실패")
     return[]
 
-# 생성된 퀴즈 데이터 형식 존재 확인
+
 def is_valid_quiz_item(item: Dict) -> bool:
     """
     개별 퀴즈 항목에 대한 유효한 형식인지 확인
@@ -72,13 +71,13 @@ def is_valid_quiz_item(item: Dict) -> bool:
         logger.debug("생성 실패: explanation 없음")
         return False
 
-    if len(item["question"]) > 200:
-        logger.debug("생성 실패: question이 너무 김 (%d자)", len(item["question"]))
-        return False
+    # if len(item["question"]) > 200:
+    #     logger.debug("생성 실패: question이 너무 김 (%d자)", len(item["question"]))
+    #     return False
 
-    if len(item["explanation"]) > 300:
-        logger.debug("생성 실패: explanation이 너무 김 (%d자)", len(item["explanation"]))
-        return False
+    # if len(item["explanation"]) > 300:
+    #     logger.debug("생성 실패: explanation이 너무 김 (%d자)", len(item["explanation"]))
+    #     return False
 
     return True
 
@@ -106,7 +105,6 @@ def score_quiz(q: Dict) -> int:
     return score
 
 
-# 생성된 Quiz 중 10문제 선별
 def filter_and_select_quizzes(quizzes: List[Dict]) -> List[Dict]:
     """
     생성된 전체 퀴즈 리스트에서 유효한 형식의 퀴즈만 선별하여,
@@ -175,7 +173,6 @@ def filter_and_select_quizzes(quizzes: List[Dict]) -> List[Dict]:
     return selected[:10]
 
 
-# 최종 파싱 및 리스트로 반환
 def parse_response(response_text: str):
     """
     LLM의 출력 문자열에서 퀴즈 정규식 기반으로 파싱한 후,
@@ -229,7 +226,6 @@ def parse_response(response_text: str):
     return quiz_list
 
 
-# 확실하게 프롬프트를 제거하고 출력
 def remove_prompt_content(output: str) -> str:
     """
     프롬프트 안내문을 제거하고 문제 본문만 추출
