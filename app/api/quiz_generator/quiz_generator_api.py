@@ -5,6 +5,7 @@ from app.config import rabbitmq_config
 import logging
 import sys
 import time
+import json
 from langfuse import Langfuse
 
 # Core logic components
@@ -45,10 +46,16 @@ def process_quiz_generation(request: FollowupRequest) -> dict:
     logger.info(f"[API 요청] 퀴즈 생성 시작: interview_id={request.interview_id}")
     logger.info(f"[API 요청] 질문 히스토리 개수: {len(request.question_history_list)}")
 
-    # 없으면 CS 퀴즈 생성
-    if request.question_history_list is None:
-        logger.warning("질문 히스토리가 None입니다. 빈 리스트로 대체합니다.")
-        request.question_history_list = []
+    # 면접 질문 없으면 바로 빈 리스트 반환
+    if not request.question_history_list:
+        logger.info(f"interview_id={request.interview_id} 면접 질문 히스토리 없음 → 빈 리스트 반환")
+        return {
+            "message": "면접 질문 히스토리 없음",
+            "data": {
+                "interview_id": request.interview_id,
+                "questions": []
+            }
+        }
 
     trace = langfuse_client.trace(
         name="quiz_generation_api",
@@ -227,7 +234,7 @@ def process_quiz_generation(request: FollowupRequest) -> dict:
             output={
                 "parsed_quiz_count": len(parsed_list),
                 "parsing_successful": True,
-                "parsed_quizzes_sample": parsed_list[:2] if len(parsed_list) >= 2 else parsed_list
+                "parsed_quizzes": json.dumps(parsed_list, ensure_ascii=False, indent=2)
             },
             metadata={
                 "execution_time_seconds": parsing_execution_time,
@@ -303,7 +310,11 @@ def process_quiz_generation(request: FollowupRequest) -> dict:
 
         request_execution_time = time.time() - request_start_time
         trace.update(
-            output={"final_quiz_count": len(quiz_items), "interview_id_processed": quiz_data_obj.interview_id},
+            output={
+                "final_quiz_count": len(quiz_items), 
+                "interview_id_processed": quiz_data_obj.interview_id,
+                "final_quizzes": json.dumps([item.model_dump() for item in quiz_items], ensure_ascii=False, indent=2)
+            },
             metadata={"total_execution_time_seconds": request_execution_time}
         )
         
@@ -394,4 +405,3 @@ async def generate_quiz_sync(req: FollowupRequest):
     except Exception as e:
         logger.error(f"동기 API 처리 중 오류: {e}")
         raise HTTPException(status_code=500, detail="내부 서버 오류")
-
