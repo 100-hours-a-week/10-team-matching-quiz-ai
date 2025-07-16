@@ -1,6 +1,6 @@
 # main.py
 from app.api.quiz_generator.quiz_generator_schema import FollowupRequest
-from app.api.quiz_generator.api import process_quiz_generation
+from app.api.quiz_generator.quiz_generator_api import process_quiz_generation
 
 if __name__ == "__main__":
     req = FollowupRequest(
