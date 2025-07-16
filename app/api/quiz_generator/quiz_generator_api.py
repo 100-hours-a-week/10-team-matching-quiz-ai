@@ -45,10 +45,16 @@ def process_quiz_generation(request: FollowupRequest) -> dict:
     logger.info(f"[API 요청] 퀴즈 생성 시작: interview_id={request.interview_id}")
     logger.info(f"[API 요청] 질문 히스토리 개수: {len(request.question_history_list)}")
 
-    # 없으면 CS 퀴즈 생성
-    if request.question_history_list is None:
-        logger.warning("질문 히스토리가 None입니다. 빈 리스트로 대체합니다.")
-        request.question_history_list = []
+    # 면접 질문 없으면 바로 빈 리스트 반환
+    if not request.question_history_list:
+        logger.info(f"interview_id={request.interview_id} 면접 질문 히스토리 없음 → 빈 리스트 반환")
+        return {
+            "message": "면접 질문 히스토리 없음",
+            "data": {
+                "interview_id": request.interview_id,
+                "questions": []
+            }
+        }
 
     trace = langfuse_client.trace(
         name="quiz_generation_api",
