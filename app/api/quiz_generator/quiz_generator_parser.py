@@ -71,13 +71,13 @@ def is_valid_quiz_item(item: Dict) -> bool:
         logger.debug("생성 실패: explanation 없음")
         return False
 
-    # if len(item["question"]) > 200:
-    #     logger.debug("생성 실패: question이 너무 김 (%d자)", len(item["question"]))
-    #     return False
+    if len(item["question"]) > 200:
+        logger.debug("생성 실패: question이 너무 김 (%d자)", len(item["question"]))
+        return False
 
-    # if len(item["explanation"]) > 300:
-    #     logger.debug("생성 실패: explanation이 너무 김 (%d자)", len(item["explanation"]))
-    #     return False
+    if len(item["explanation"]) > 300:
+        logger.debug("생성 실패: explanation이 너무 김 (%d자)", len(item["explanation"]))
+        return False
 
     return True
 
