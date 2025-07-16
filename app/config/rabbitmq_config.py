@@ -10,6 +10,7 @@ RABBITMQ_PASSWORD = os.getenv('RABBITMQ_PASSWORD', 'guest')
 RABBITMQ_VIRTUAL_HOST = "/" 
 
 # --- Quiz Generation Flow ---
+RABBITMQ_TIMEOUT = 30
 
 # BE -> AIServer 
 QUIZ_REQUEST_EXCHANGE_NAME = "quiz.request.exchange"

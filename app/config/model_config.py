@@ -1,21 +1,15 @@
-
-
 import os
 from typing import List, Dict, Any
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# 환경 감지
 def _detect_environment() -> str:
     """현재 환경 감지"""
     env = os.getenv("ENVIRONMENT", "local")
 
-    # 자동 환경 감지
     if os.getenv("GCP_PROJECT"):
-        return "gcp-gke"
-    elif os.getenv("KUBERNETES_SERVICE_HOST"):
-        return "kubernetes"
+        return "gcp-vm"
     else:
         return env
 
@@ -24,13 +18,10 @@ def _parse_enabled_models() -> List[str]:
     enabled = os.getenv("ENABLED_MODELS", "question_generator")
     return [model.strip() for model in enabled.split(",")]
 
-# 환경 설정
 ENVIRONMENT = _detect_environment()
 
-# 활성화된 모델들
 ENABLED_MODELS = _parse_enabled_models()
 
-# vLLM 설정 (question_generator용)
 VLLM_CONFIG = {
     "model_path": os.getenv(
         "LLM_MODEL_PATH", "TommyKong/gemma-3-finetune-4bit"

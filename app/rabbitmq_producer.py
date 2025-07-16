@@ -3,7 +3,7 @@ import asyncio
 import aio_pika
 import json
 import uuid
-from app.config import rabbitmq_config # 생성한 설정 파일 import
+from app.config import rabbitmq_config 
 
 logger = logging.getLogger(__name__)
 
@@ -26,12 +26,12 @@ async def get_rabbitmq_connection():
                 login=rabbitmq_config.RABBITMQ_USER,
                 password=rabbitmq_config.RABBITMQ_PASSWORD,
                 virtualhost=rabbitmq_config.RABBITMQ_VIRTUAL_HOST,
-                timeout=10 # 연결 타임아웃 설정 (초 단위)
+                timeout=rabbitmq_config.RABBITMQ_TIMEOUT
             )
             logger.info("Successfully connected to RabbitMQ.")
         except Exception as e:
             logger.error(f"Failed to connect to RabbitMQ: {e}")
-            _connection = None # 연결 실패 시 None으로 유지
+            _connection = None 
             raise
     return _connection
 
@@ -44,24 +44,22 @@ async def get_rabbitmq_channel():
     connection = await get_rabbitmq_connection()
     if connection is None:
         logger.error("Cannot get RabbitMQ channel because connection is not established.")
-        return None, None # 연결이 없으면 채널도 없음
+        return None, None 
 
     if _channel is None or _channel.is_closed:
         try:
             _channel = await connection.channel()
             logger.info("RabbitMQ channel obtained.")
-            # Exchange 선언 (없으면 생성, idempotent) -> 내가 생성을 안해도 된다. 
             _exchange = await _channel.declare_exchange(
                 name=rabbitmq_config.SERVICE_EXCHANGE_NAME,
-                type=aio_pika.ExchangeType(rabbitmq_config.SERVICE_EXCHANGE_TYPE), # aio_pika.ExchangeType 사용
-                durable=True # 브로커가 재시작되어도 Exchange 유지
+                type=aio_pika.ExchangeType(rabbitmq_config.SERVICE_EXCHANGE_TYPE), 
+                durable=True 
             )
             logger.info(f"RabbitMQ exchange '{rabbitmq_config.SERVICE_EXCHANGE_NAME}' declared.")
         except Exception as e:
             logger.error(f"Failed to get RabbitMQ channel or declare exchange: {e}")
             _channel = None
             _exchange = None
-            # 필요시 예외를 다시 발생시킬 수 있음
     return _channel, _exchange
 
 async def publish_message(routing_key: str, message_body: dict):
@@ -76,18 +74,16 @@ async def publish_message(routing_key: str, message_body: dict):
 
         message = aio_pika.Message(
             body=json.dumps(message_body).encode(),
-            delivery_mode=aio_pika.DeliveryMode.PERSISTENT, # 메시지 영속성
+            delivery_mode=aio_pika.DeliveryMode.PERSISTENT,
             content_type="application/json",
-            message_id=str(uuid.uuid4()) # 각 메시지에 고유 ID 부여
+            message_id=str(uuid.uuid4())
         )
 
         await exchange.publish(message, routing_key=routing_key)
         logger.info(f"Successfully published message to routing key '{routing_key}' (ID: {message.message_id})")
-        # logger.debug(f"Message content: {message_body}")
         return True
     except Exception as e:
         logger.error(f"Error publishing message to routing key '{routing_key}': {e}")
-        # 필요시 예외 재발생 또는 특정 값 반환
         return False
 
 async def publish_response_message(message_body: dict, exchange_name: str = None, routing_key: str = None):
@@ -139,7 +135,7 @@ async def close_rabbitmq_connection():
         except Exception as e:
             logger.error(f"Error closing RabbitMQ channel: {e}")
     _channel = None
-    _exchange = None # 채널이 닫히면 exchange도 유효하지 않음
+    _exchange = None 
 
     if _connection and not _connection.is_closed:
         try:
