@@ -3,29 +3,18 @@ import json
 import logging
 import time
 from typing import Optional
-
 import aio_pika
 from aio_pika.exceptions import AMQPConnectionError
-
-# Configs
 from app.config import rabbitmq_config
-
-# Schema for input
 from app.api.stt_feedback.stt_feedback_schema import VoiceFeedbackRequest
-
-# API 함수 직접 import
 from app.api.stt_feedback.stt_feedback_api import process_feedback_request
-
 from app.api.stt_feedback.stt_model_loader import WhisperXModel
 from app import rabbitmq_producer
 
-# Setup logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("STTFeedbackWorker")
-
-# 중복된 함수들 모두 제거
 
 async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
     async with message.process(ignore_processed=True):
@@ -36,7 +25,6 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
 
             request_start_time = time.time()
 
-            # WhisperX 모델 확인
             if WhisperXModel.model is None:
                 logger.info("WhisperX model not loaded. Attempting to load...")
                 WhisperXModel.ensure_loaded()
@@ -72,7 +60,7 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
             if api_response:
                 try:
                     response_success = await rabbitmq_producer.publish_response_message(
-                        message_body=api_response,  # API 응답을 그대로 사용
+                        message_body=api_response,  
                         exchange_name=rabbitmq_config.STT_RESPONSE_EXCHANGE_NAME,
                         routing_key=rabbitmq_config.STT_RESPONSE_ROUTING_KEY
                     )
@@ -106,7 +94,7 @@ async def main_stt_feedback_worker():
     for attempt in range(max_retries):
         try:
             WhisperXModel.ensure_loaded()
-            if WhisperXModel.model is not None:  # is_loaded() 대신 직접 모델 체크
+            if WhisperXModel.model is not None:  
                 logger.info("STT Feedback Worker: WhisperX model loaded successfully.")
                 break
             else:
