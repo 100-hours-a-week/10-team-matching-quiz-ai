@@ -83,7 +83,14 @@ async def process_stt_feedback_task(message: aio_pika.IncomingMessage):
                 except Exception as e:
                     logger.error(f"Error publishing STT response for recording {req.recording_url}: {e}")
             
-            logger.info(f"Generated STT Feedback: {api_response}")
+            logger.info(f"Generated STT Feedback for {len(req.question_lists)} questions")
+            if api_response and 'feedback_lists' in api_response:
+                for idx, feedback_item in enumerate(api_response['feedback_lists']):
+                    feedback_data = feedback_item.get('feedback', {})
+                    logger.info(f"Question {idx+1} - Score: {feedback_data.get('overall_score', 0)}점")
+                    logger.info(f"Question {idx+1} - Detailed Analysis: {feedback_data.get('detailed_analysis', '')[:100]}...")
+                    logger.info(f"Question {idx+1} - Good Points: {feedback_data.get('good_points', '')[:50]}...")
+                    logger.info(f"Question {idx+1} - Areas for Improvement: {feedback_data.get('areas_for_improvement', '')[:50]}...")
 
             await message.ack()
             logger.info(f"Message {message.message_id} acked.")

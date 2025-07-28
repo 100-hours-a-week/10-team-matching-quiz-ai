@@ -89,7 +89,11 @@ def run_feedback_pipeline(
                 trace.span("generate_feedback_gemini", input={"question": q.question, "answer": transcript}).end()
                 result = generate_feedback_gemini(q.question, transcript)
                 trace.span("feedback_result", output={"feedback": result})
-                logger.info(f"[{i+1}/{len(question_lists)}] Gemini 응답 - 모범답안: '{result['model_answer']}', 피드백: '{result['feedback']}'")
+                logger.info(f"[{i+1}/{len(question_lists)}] Gemini 응답 - 모범답안: '{result['model_answer']}'")
+                logger.info(f"[{i+1}/{len(question_lists)}] 피드백 점수: {result['feedback'].get('overall_score', 0)}점")
+                logger.info(f"[{i+1}/{len(question_lists)}] 피드백 상세분석: {result['feedback'].get('detailed_analysis', '')[:100]}...")
+                logger.info(f"[{i+1}/{len(question_lists)}] 좋은 점: {result['feedback'].get('good_points', '')[:50]}...")
+                logger.info(f"[{i+1}/{len(question_lists)}] 개선점: {result['feedback'].get('areas_for_improvement', '')[:50]}...")
 
                 feedback_items.append(FeedbackItem(
                     segment_id=q.segment_id,

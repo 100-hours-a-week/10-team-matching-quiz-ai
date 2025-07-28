@@ -21,15 +21,32 @@ async def block_non_post_generate(request: Request):
     )
 
 
-def format_feedback(feedback_dict: dict) -> str:
-    if not feedback_dict:
-        return ""
-    return (
-        f"{feedback_dict.get('overall_score', '')} 점\n\n"
-        f"{feedback_dict.get('detailed_analysis', '')}\n\n"
-        f"잘한 점: {feedback_dict.get('good_points', '')}\n\n"
-        f"개선할 점: {feedback_dict.get('areas_for_improvement', '')}"
-    )
+# def format_feedback(feedback_dict: dict) -> str:
+#     if not feedback_dict:
+#         return ""
+#     
+#     # 점수 추출
+#     score = feedback_dict.get('overall_score', 0)
+#     
+#     # 상세 분석 추출
+#     detailed_analysis = feedback_dict.get('detailed_analysis', '')
+#     
+#     # 좋은 점과 개선점을 하나로 통합
+#     good_points = feedback_dict.get('good_points', '')
+#     areas_for_improvement = feedback_dict.get('areas_for_improvement', '')
+#     
+#     # 통합된 피드백 생성
+#     integrated_feedback = f"{score}점\n\n{detailed_analysis}"
+#     
+#     # 좋은 점과 개선점이 있는 경우에만 추가
+#     if good_points and areas_for_improvement:
+#         integrated_feedback += f"\n\n잘한 점: {good_points}\n\n개선할 점: {areas_for_improvement}"
+#     elif good_points:
+#         integrated_feedback += f"\n\n잘한 점: {good_points}"
+#     elif areas_for_improvement:
+#         integrated_feedback += f"\n\n개선할 점: {areas_for_improvement}"
+#     
+#     return integrated_feedback
 
 
 # 피드백 생성
@@ -49,23 +66,29 @@ def process_feedback_request(request: VoiceFeedbackRequest) -> dict:
         question_lists=request.question_lists
     )
 
-    # 변환 적용: feedback dict → string
-    for item in result.feedbackLists:
-        item.feedback = format_feedback(item.feedback)
+    # 변환 적용: feedback dict → string (주석 처리됨)
+    # for item in result.feedbackLists:
+    #     item.feedback = format_feedback(item.feedback)
 
     # pipeline 수행 후 결과 확인
     for idx, item in enumerate(result.feedbackLists):
         logger.info(f"[Feedback Result][{idx+1}] Segment ID: {item.segment_id}")
         logger.info(f"[Feedback Result][{idx+1}] 질문: {item.question}")
         logger.info(f"[Feedback Result][{idx+1}] 질문별 모범답안: {item.model_answer}")
-        logger.info(f"[Feedback Result][{idx+1}] 질문별 피드백: {item.feedback}")
+        logger.info(f"[Feedback Result][{idx+1}] 질문별 피드백 점수: {item.feedback.get('overall_score', 0)}점")
+        logger.info(f"[Feedback Result][{idx+1}] 질문별 피드백 상세분석: {item.feedback.get('detailed_analysis', '')[:100]}...")
         
     response = result.model_dump()
     response['feedback_lists'] = [
         {
             "segment_id": item["segment_id"],
             "model_answer": item["model_answer"],
-            "feedback": item["feedback"]
+            "feedback": {
+                "overall_score": item["feedback"].get("overall_score", 0),
+                "detailed_analysis": item["feedback"].get("detailed_analysis", ""),
+                "good_points": item["feedback"].get("good_points", ""),
+                "areas_for_improvement": item["feedback"].get("areas_for_improvement", "")
+            }
         }
         for item in response['feedbackLists']
     ]

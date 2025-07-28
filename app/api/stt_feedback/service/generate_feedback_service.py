@@ -112,7 +112,7 @@ def generate_feedback_gemini(question: str, answer: str) -> dict:
                 "detailed_analysis": f"오류 메시지: {e}"
             }
         }
-"""
+
 # --- 테스트 코드 예시 ---
 if __name__ == "__main__":
     if not os.getenv("STT_GEMINI_API_KEY"):
@@ -143,4 +143,3 @@ if __name__ == "__main__":
     print(feedback_result_2["model_answer"])
     print("\n[피드백]:")
     print(json.dumps(feedback_result_2["feedback"], indent=2, ensure_ascii=False))
-"""
