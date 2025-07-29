@@ -70,7 +70,10 @@ def run_feedback_pipeline(
 
         for i, q in enumerate(question_lists):
             try:
-                trace.span("cut_audio", input={"audio_path": local_path, "start_time": q.start_time, "end_time": q.end_time}).end()
+                if trace:
+                    cut_span = trace.span(name="cut_audio")
+                    cut_span.update(input={"audio_path": local_path, "start_time": q.start_time, "end_time": q.end_time})
+                    cut_span.end()
                 logger.info(f"[{i+1}/{len(question_lists)}] 질문 처리 시작: '{q.question}'")
 
                 segment = cut_audio(local_path, q.start_time, q.end_time)
@@ -81,14 +84,30 @@ def run_feedback_pipeline(
                 segment.export(segment_path, format='mp3')
                 logger.info(f"[{i+1}/{len(question_lists)}] 자른 오디오 저장 완료: {segment_path}")
 
-                trace.span("transcribe_whisperx", input={"segment_path": segment_path}).end()
+                if trace:
+                    transcribe_span = trace.span(name="transcribe_whisperx")
+                    transcribe_span.update(input={"segment_path": segment_path})
+                    transcribe_span.end()
+                
                 transcript = transcribe_whisperx(segment)
                 logger.info(f"[{i+1}/{len(question_lists)}] STT 결과: '{transcript}'")
-                trace.span("transcription_result", output={"transcription": transcript}).end()
+                
+                if trace:
+                    transcript_result_span = trace.span(name="transcription_result")
+                    transcript_result_span.update(output={"transcription": transcript})
+                    transcript_result_span.end()
 
-                trace.span("generate_feedback_gemini", input={"question": q.question, "answer": transcript}).end()
+                if trace:
+                    feedback_span = trace.span(name="generate_feedback_gemini")
+                    feedback_span.update(input={"question": q.question, "answer": transcript})
+                    feedback_span.end()
+                
                 result = generate_feedback_gemini(q.question, transcript)
-                trace.span("feedback_result", output={"feedback": result})
+                
+                if trace:
+                    result_span = trace.span(name="feedback_result")
+                    result_span.update(output={"feedback": result})
+                    result_span.end()
                 logger.info(f"[{i+1}/{len(question_lists)}] Gemini 응답 - 모범답안: '{result['model_answer']}'")
                 logger.info(f"[{i+1}/{len(question_lists)}] 피드백 점수: {result['feedback'].get('overall_score', 0)}점")
                 logger.info(f"[{i+1}/{len(question_lists)}] 피드백 상세분석: {result['feedback'].get('detailed_analysis', '')[:100]}...")
@@ -103,7 +122,8 @@ def run_feedback_pipeline(
                 ))
 
             except Exception as item_error:
-                trace.error(f"[PIPELINE][{i+1}/{len(question_lists)}] 질문 처리 실패 - 질문: '{q.question}', 오류: {item_error}")
+                if trace:
+                    trace.update(status="ERROR", output={"error": f"질문 처리 실패: {str(item_error)}"})
                 logger.error(
                     f"[PIPELINE][{i+1}/{len(question_lists)}] 질문 처리 실패 - 질문: '{q.question}', 오류: {item_error}"
                 )
@@ -114,15 +134,19 @@ def run_feedback_pipeline(
 
         logger.info(f"[PIPELINE] 총 {len(feedback_items)}개 질문 처리 완료")
 
-        trace.span(name="pipeline_complete", output={...})
-        trace.update(output={"feedback_items": [item.model_dump() for item in feedback_items]})
+        if trace:
+            complete_span = trace.span(name="pipeline_complete")
+            complete_span.update(output={"feedback_count": len(feedback_items)})
+            complete_span.end()
+            trace.update(output={"feedback_items": [item.model_dump() for item in feedback_items]})
 
         return FeedbackResponse(
             feedbackLists=feedback_items
         )
 
     except Exception as e:
-        trace.error(f"[PIPELINE] 전체 파이프라인 오류 - 오류: {e}")
+        if trace:
+            trace.update(status="ERROR", output={"error": f"전체 파이프라인 오류: {str(e)}"})
         logger.critical(f"[PIPELINE] 전체 파이프라인 오류 - 오류: {e}")
         raise
     finally:
